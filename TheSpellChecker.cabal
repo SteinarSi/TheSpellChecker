@@ -1,0 +1,80 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.34.4.
+--
+-- see: https://github.com/sol/hpack
+
+name:           TheSpellChecker
+version:        0.1.0.0
+description:    Please see the README on GitHub at <https://github.com/SteinarSi/TheSpellChecker#readme>
+homepage:       https://github.com/SteinarSi/TheSpellChecker#readme
+bug-reports:    https://github.com/SteinarSi/TheSpellChecker/issues
+author:         Steinar
+maintainer:     Steinar.Simonnes@gmail.com
+copyright:      2022 Steinar
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+    ChangeLog.md
+
+source-repository head
+  type: git
+  location: https://github.com/SteinarSi/TheSpellChecker
+
+library
+  exposed-modules:
+      Calculus
+      Expr
+      Parser
+  other-modules:
+      Paths_TheSpellChecker
+  hs-source-dirs:
+      src
+  build-depends:
+      base >=4.7 && <5
+    , cyclotomic
+    , megaparsec
+    , mtl
+    , text
+    , text-show
+    , transformers
+  default-language: Haskell2010
+
+executable TheSpellChecker-exe
+  main-is: Main.hs
+  other-modules:
+      Paths_TheSpellChecker
+  hs-source-dirs:
+      app
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      TheSpellChecker
+    , base >=4.7 && <5
+    , cyclotomic
+    , megaparsec
+    , mtl
+    , text
+    , text-show
+    , transformers
+  default-language: Haskell2010
+
+test-suite TheSpellChecker-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Paths_TheSpellChecker
+  hs-source-dirs:
+      test
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      TheSpellChecker
+    , base >=4.7 && <5
+    , cyclotomic
+    , megaparsec
+    , mtl
+    , text
+    , text-show
+    , transformers
+  default-language: Haskell2010
