@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 
-module Parser (parseTester) where
+module Parser (parseFunction) where
 
 import Text.Megaparsec ( (<|>), many, oneOf, MonadParsec(try, parseError), ParsecT, runParserT, ParseErrorBundle )
 import Text.Megaparsec.Char (char, string)
@@ -18,10 +18,12 @@ import Data.Number.RealCyclotomic (RealCyclotomic)
 import Prelude hiding (pi)
 import qualified Prelude as P
 
+import Control.Monad (replicateM)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.State (State, get, runState, evalState, modify)
 
-import Expr (Expr(..), Function(Function), Parameter, realToRat)
+import Expr (Expr(..), Function(Function), Parameter, realToRat, betaReduce)
+import GHC.Base (undefined)
 
 {-
 
@@ -43,12 +45,18 @@ Letter       => a | b | c | .... | z | A | B | ... | Z | α | β | ... | ω     
 
 type Parser = ParsecT Void Text (State ([Function], [Text]))
 
-parseTester :: Text -> Either (ParseErrorBundle Text Void) Function
-parseTester s = evalState (runParserT parseFunction "Test" (T.filter (/=' ') s)) ([], [])
+--parseTester :: Text -> Either (ParseErrorBundle Text Void) Function
+--parseTester s = evalState (runParserT parseFunction "Test" (T.filter (/=' ') s)) ([], [])
 
 
-parseFunction :: Parser Function
-parseFunction = Function <$> parseName <*> (char '(' *> parseParams <* char ')' <* char '=') <*> parseExpr
+
+
+parseFunction :: [Function] -> Text -> Either (ParseErrorBundle Text Void) Function
+parseFunction fs s = evalState (runParserT f "User input" (T.filter (/=' ') s)) (fs, [])
+    where f = Function <$> parseName <*> (char '(' *> parseParams <* char ')' <* char '=') <*> parseExpr
+    
+    
+    --lift put fs >> Function <$> parseName <*> (char '(' *> parseParams <* char ')' <* char '=') <*> parseExpr
 
 parseName :: Parser Text 
 parseName = T.pack <$> many1 letter
@@ -80,7 +88,7 @@ parseFactor = parseNum >>= \n -> Expo n <$> (char '^' *> parseFactor) <|> pure n
 
 -- Lager en liste på formen [ *faktor, /faktor, *faktor ], som kan settes sammen venstreassosiativt med en initiell faktor
 parseFactorList :: Parser [Expr -> Expr]
-parseFactorList = fmap ((:) . flip Mult) (char '*' *> parseFactor) <*> parseFactorList
+parseFactorList = fmap ((:) . flip Mult) ((char '*' *> parseFactor) <|> parseFactor) <*> parseFactorList
               <|> fmap ((:) . flip Div)  (char '/' *> parseFactor) <*> parseFactorList
               <|> pure []
 
@@ -108,6 +116,17 @@ parseNum = try (Num <$> parseCyclotomic)
 parseFunctionCall :: Parser Expr
 parseFunctionCall = try (Log (Num e) <$> ((string "log" <|> string "Log" <|> string "ln" <|> string "Ln") *> char '(' *> parseExpr <* char ')')) --log med e som base
        <|> try (Log <$> ((string "log" <|> string "Log") *> (char '[' *> parseExpr <* char ']' <|> fmap Num parseCyclotomic)) <*> (char '(' *> parseExpr <* char ')')) -- log med custom base
+       <|> (do
+            name <- T.pack <$> many1 letter   
+            (fs, _) <- lift get
+            case [ f | f@(Function fname _ _)<-fs, name == fname ] of
+                [] -> failT ("Unrecognized function: " <> name)
+                (Function fname params ex:_) -> do
+                    char '('
+                    args <- replicateM (length params) (tryWhatever (char ',') parseExpr) 
+                    char ')'
+                    pure (betaReduce ex (zip params args))
+       )
 
 
 parseCyclotomic :: Parser RealCyclotomic
@@ -124,6 +143,10 @@ digit = oneOf ['0'..'9']
 
 withDefault :: Parser a -> a -> Parser a
 withDefault rule default' = try rule <|> pure default'
+
+-- Gjør den første regelen, og bryr seg ikke om den feiler eller ikke før den tar den neste regelen.
+tryWhatever :: Parser a -> Parser b -> Parser b
+tryWhatever ignore rule = (try ignore *> rule) <|> rule
 
 many1 :: Parser a -> Parser [a]
 many1 a = (:) <$> a <*> many a

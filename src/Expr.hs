@@ -3,12 +3,13 @@
 
 {-# LANGUAGE OverloadedStrings #-}
 
-module Expr (Expr(..), Argument, Parameter, Function(Function), realToRat) where
+module Expr (Expr(..), Argument, Parameter, Function(Function), realToRat, evalConstant, evalFunction, betaReduce) where
 
 import Data.Number.RealCyclotomic (RealCyclotomic, toReal, toRat)
 import Data.Text (Text, unpack, pack)
+import Data.List (intersperse)
 
-import TextShow (TextShow(..), showbParen, showb, fromText)
+import TextShow (TextShow(..), showbParen, showb, fromText, toText, toString)
 
 
 -- 2 + 3 * 4^5 = Add (Num 2) (Mult (Num 3) (Expo (Num 4) (Num 5)))
@@ -28,19 +29,37 @@ type Argument = (Text, RealCyclotomic)
 type Parameter = Text
 
 data Function = Function Text [Parameter] Expr
-    deriving Show
 
+instance Show Function where
+    show (Function name params expr) = unpack name <> "(" <> concat (intersperse "," (map unpack params)) <> ")=" <> toString (showb expr)
 
-
- ---TODOOOOOOO
 instance TextShow Expr where
-    showbPrec p (Num  a)   = showb a
-    showbPrec p (Add  a b) = showbParen (5 < p) (showbPrec p a <> "+" <> showbPrec 5 b)
-    showbPrec p (Mult a b) = showbParen (6 < p) (showbPrec p a <> "*" <> showbPrec 6 b)
-    showbPrec p (Expo a b) = showbParen (7 < p) (showbPrec p a <> "^" <> showbPrec 7 b)
+    showbPrec p (Num  a)    = showb a
+    showbPrec p (Var v)     = fromText v
+    showbPrec p (Add  a b)  = showbParen (5 < p) (showbPrec p a <> "+" <> showbPrec 5 b)
+    showbPrec p (USub a)    = showbParen (5 < p) ("-" <> showbPrec p a)
+    showbPrec p (BSub a b) = showbParen (5 < p) (showbPrec p a <> "-" <> showbPrec 5 b)
+    showbPrec p (Mult a b)  = showbParen (6 < p) (showbPrec p a <> "*" <> showbPrec 6 b)
+    showbPrec p (Div a b)   = showbParen (6 < p) (showbPrec p a <> "/" <> showbPrec 6 b)
+    showbPrec p (Expo a b)  = showbParen (7 < p) (showbPrec p a <> "^" <> showbPrec 7 b)
+    showbPrec p (Log a b)   = "log[" <> showb a <> "](" <> showb b <> ")"
 
 instance TextShow RealCyclotomic where
     showb = fromText . pack . show
+
+
+
+-- erstatter alle variabler med sin nye verdi.
+betaReduce :: Expr -> [(Text, Expr)] -> Expr
+betaReduce (Var v) args = head [ value | (name, value) <- args, v == name ]
+betaReduce (Num n) args = Num n
+betaReduce (Add a b) args = Add (betaReduce a args) (betaReduce b args)
+betaReduce (USub a) args = USub (betaReduce a args)
+betaReduce (BSub a b) args = BSub (betaReduce a args) (betaReduce b args)
+betaReduce (Mult a b) args = Mult (betaReduce a args) (betaReduce b args)
+betaReduce (Div a b) args = Div (betaReduce a args) (betaReduce b args)
+betaReduce (Expo a b) args = Expo (betaReduce a args) (betaReduce b args)
+betaReduce (Log a b) args = Log (betaReduce a args) (betaReduce b args)
 
 isConstant :: Expr -> Bool 
 isConstant (Var _) = False 
@@ -68,19 +87,20 @@ evalConstant (Expo a b) = realToRat $ toReal (evalConstant a) ** toReal (evalCon
 
 -- Kræsjer om den ikke får alle parametrene den skal.
 
---evalFunction :: Function -> [Argument] -> Either Text RealCyclotomic 
---evalFunction = undefined 
+evalFunction :: Function -> [Argument] -> Either Text RealCyclotomic 
+evalFunction (Function _ params ex) args | params == map fst args = Right $ evalFunction' ex args
+                                         | otherwise = Left ("Function arguments did not match function parameters: " <> toText (showb (map fst args)) <> " vs " <> toText (showb params))
+    where
+        evalFunction' :: Expr -> [Argument] -> RealCyclotomic 
+        evalFunction' (Var v) params = head [ value | (name, value) <- params, v == name ]
+        evalFunction' (Num a) _ = a
+        evalFunction' (Add a b) params = evalFunction' a params + evalFunction' b params
+        evalFunction' (BSub a b) params = evalFunction' a params - evalFunction' b params
+        evalFunction' (USub a) params = - evalFunction' a params
+        evalFunction' (Mult a b) params = evalFunction' a params * evalFunction' b params
+        evalFunction' (Div a b) params = evalFunction' a params / evalFunction' b params
+        evalFunction' (Log a b) params = realToRat $ logBase (toReal (evalFunction' a params)) (toReal (evalFunction' b params))
+        evalFunction' (Expo a b) params = realToRat $ toReal (evalFunction' a params) ** toReal (evalFunction' b params)
 
-evalFunction :: Expr -> [Argument] -> RealCyclotomic 
-evalFunction (Var v) params = head [ value | (name, value) <- params, v == name ]
-evalFunction (Num a) _ = a
-evalFunction (Add a b) params = evalFunction a params + evalFunction b params
-evalFunction (BSub a b) params = evalFunction a params - evalFunction b params
-evalFunction (USub a) params = - evalFunction a params
-evalFunction (Mult a b) params = evalFunction a params * evalFunction b params
-evalFunction (Div a b) params = evalFunction a params / evalFunction b params
-evalFunction (Log a b) params = realToRat $ logBase (toReal (evalFunction a params)) (toReal (evalFunction b params))
-evalFunction (Expo a b) params = realToRat $ toReal (evalFunction a params) ** toReal (evalFunction b params)
-
-realToRat :: Real a => a -> RealCyclotomic
+realToRat :: (Real a, Fractional b) => a -> b
 realToRat = fromRational . realToFrac
