@@ -27,6 +27,7 @@ dependencies:
 - transformers
 - mtl
 - text-show
+- HUnit
 
 library:
   source-dirs: src
@@ -44,7 +45,7 @@ executables:
 
 tests:
   TheSpellChecker-test:
-    main:                Spec.hs
+    main:                TestMain.hs
     source-dirs:         test
     ghc-options:
     - -threaded

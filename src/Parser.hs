@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 
-module Parser (parseFunction) where
+module Parser (parseFunction, parseExpression) where
 
 import Text.Megaparsec ( (<|>), many, oneOf, MonadParsec(try, parseError), ParsecT, runParserT, ParseErrorBundle )
 import Text.Megaparsec.Char (char, string)
@@ -55,7 +55,10 @@ parseFunction :: [Function] -> Text -> Either (ParseErrorBundle Text Void) Funct
 parseFunction fs s = evalState (runParserT f "User input" (T.filter (/=' ') s)) (fs, [])
     where f = Function <$> parseName <*> (char '(' *> parseParams <* char ')' <* char '=') <*> parseExpr
     
-    
+
+parseExpression :: Text -> Either (ParseErrorBundle Text Void) Expr
+parseExpression s = evalState (runParserT parseExpr "User input" (T.filter (/=' ' ) s)) ([], [])
+
     --lift put fs >> Function <$> parseName <*> (char '(' *> parseParams <* char ')' <* char '=') <*> parseExpr
 
 parseName :: Parser Text 

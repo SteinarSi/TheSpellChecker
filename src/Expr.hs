@@ -47,8 +47,6 @@ instance TextShow Expr where
 instance TextShow RealCyclotomic where
     showb = fromText . pack . show
 
-
-
 -- erstatter alle variabler med sin nye verdi.
 betaReduce :: Expr -> [(Text, Expr)] -> Expr
 betaReduce (Var v) args = head [ value | (name, value) <- args, v == name ]
@@ -84,8 +82,6 @@ evalConstant (Div a b) = evalConstant a / evalConstant b
 evalConstant (Log a b) = realToRat $ logBase (toReal (evalConstant a)) (toReal (evalConstant b))
 evalConstant (Expo a b) = realToRat $ toReal (evalConstant a) ** toReal (evalConstant b)
 
-
--- Kræsjer om den ikke får alle parametrene den skal.
 
 evalFunction :: Function -> [Argument] -> Either Text RealCyclotomic 
 evalFunction (Function _ params ex) args | params == map fst args = Right $ evalFunction' ex args
