@@ -3,14 +3,14 @@
 
 {-# LANGUAGE OverloadedStrings #-}
 
-module Expr (Expr(..), Argument, Parameter, Function(Function), realToRat, evalConstant, evalFunction, betaReduce) where
+module Expr (Expr(..), Argument, Parameter, Function(Function), evalConstant, evalFunction, betaReduce) where
 
 import Data.Number.RealCyclotomic (RealCyclotomic, toReal, toRat)
 import Data.Text (Text, unpack, pack)
 import Data.List (intersperse)
 
 import TextShow (TextShow(..), showbParen, showb, fromText, toText, toString)
-
+import Utility (realToRat)
 
 -- 2 + 3 * 4^5 = Add (Num 2) (Mult (Num 3) (Expo (Num 4) (Num 5)))
 
@@ -36,12 +36,12 @@ instance Show Function where
 instance TextShow Expr where
     showbPrec p (Num  a)    = showb a
     showbPrec p (Var v)     = fromText v
-    showbPrec p (Add  a b)  = showbParen (5 < p) (showbPrec p a <> "+" <> showbPrec 5 b)
+    showbPrec p (Add  a b)  = showbParen (5 < p) (showbPrec 5 a <> "+" <> showbPrec 5 b)
     showbPrec p (USub a)    = showbParen (5 < p) ("-" <> showbPrec p a)
-    showbPrec p (BSub a b) = showbParen (5 < p) (showbPrec p a <> "-" <> showbPrec 5 b)
-    showbPrec p (Mult a b)  = showbParen (6 < p) (showbPrec p a <> "*" <> showbPrec 6 b)
-    showbPrec p (Div a b)   = showbParen (6 < p) (showbPrec p a <> "/" <> showbPrec 6 b)
-    showbPrec p (Expo a b)  = showbParen (7 < p) (showbPrec p a <> "^" <> showbPrec 7 b)
+    showbPrec p (BSub a b) = showbParen (5 < p) (showbPrec 5 a <> "-" <> showbPrec 5 b)
+    showbPrec p (Mult a b)  = showbParen (6 < p) (showbPrec 5 a <> "*" <> showbPrec 6 b)
+    showbPrec p (Div a b)   = showbParen (6 < p) (showbPrec 5 a <> "/" <> showbPrec 6 b)
+    showbPrec p (Expo a b)  = showbParen (7 < p) (showbPrec 5 a <> "^" <> showbPrec 7 b)
     showbPrec p (Log a b)   = "log[" <> showb a <> "](" <> showb b <> ")"
 
 instance TextShow RealCyclotomic where
@@ -97,6 +97,3 @@ evalFunction (Function _ params ex) args | params == map fst args = Right $ eval
         evalFunction' (Div a b) params = evalFunction' a params / evalFunction' b params
         evalFunction' (Log a b) params = realToRat $ logBase (toReal (evalFunction' a params)) (toReal (evalFunction' b params))
         evalFunction' (Expo a b) params = realToRat $ toReal (evalFunction' a params) ** toReal (evalFunction' b params)
-
-realToRat :: (Real a, Fractional b) => a -> b
-realToRat = fromRational . realToFrac

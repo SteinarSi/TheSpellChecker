@@ -22,8 +22,8 @@ import Control.Monad (replicateM)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.State (State, get, runState, evalState, modify)
 
-import Expr (Expr(..), Function(Function), Parameter, realToRat, betaReduce)
-import GHC.Base (undefined)
+import Expr (Expr(..), Function(Function), Parameter, betaReduce)
+import Utility (pi, e, realToRat, failT)
 
 {-
 
@@ -154,11 +154,3 @@ tryWhatever ignore rule = (try ignore *> rule) <|> rule
 many1 :: Parser a -> Parser [a]
 many1 a = (:) <$> a <*> many a
 
-e :: RealCyclotomic
-e = 2.71828182845904523536028747
-
-pi :: RealCyclotomic
-pi = realToFrac P.pi
-
-failT :: MonadFail m => Text -> m a
-failT = fail . T.unpack

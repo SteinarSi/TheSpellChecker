@@ -28,6 +28,7 @@ library
       Calculus
       Expr
       Parser
+      Utility
   other-modules:
       Paths_TheSpellChecker
   hs-source-dirs:

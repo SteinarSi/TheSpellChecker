@@ -21,5 +21,3 @@ loop fs = do
     case parseFunction fs (pack inn) of
         Left er -> print er >> loop fs
         Right f -> putStrLn ("Function parsed like this: " ++ show f) >> loop (f:fs)
-
-
