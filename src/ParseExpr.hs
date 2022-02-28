@@ -1,14 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 
-module Parser (parseFunction, parseExpression) where
+module ParseExpr (parseExpr, parse) where
 
 import Text.Megaparsec ( (<|>), many, oneOf, MonadParsec(try, parseError), ParsecT, runParserT, ParseErrorBundle )
 import Text.Megaparsec.Char (char, string)
 import Data.Void (Void)
 import qualified Data.Text as T
 import Data.Text (Text)
-import Data.Text.Read (double)
 import Text.Read (readMaybe)
 import Data.Functor (($>))
 import Data.Function ((&))
@@ -23,7 +22,8 @@ import Control.Monad.Trans.Class (lift)
 import Control.Monad.State (State, get, runState, evalState, modify)
 
 import Expr (Expr(..), Function(Function), Parameter, betaReduce)
-import Utility (pi, e, realToRat, failT)
+import Utility
+import ParserUtility
 
 {-
 
@@ -43,35 +43,9 @@ Letter       => a | b | c | .... | z | A | B | ... | Z | α | β | ... | ω     
 
 -}
 
-type Parser = ParsecT Void Text (State ([Function], [Text]))
-
---parseTester :: Text -> Either (ParseErrorBundle Text Void) Function
---parseTester s = evalState (runParserT parseFunction "Test" (T.filter (/=' ') s)) ([], [])
 
 
 
-
-parseFunction :: [Function] -> Text -> Either (ParseErrorBundle Text Void) Function
-parseFunction fs s = evalState (runParserT f "User input" (T.filter (/=' ') s)) (fs, [])
-    where f = Function <$> parseName <*> (char '(' *> parseParams <* char ')' <* char '=') <*> parseExpr
-    
-
-parseExpression :: Text -> Either (ParseErrorBundle Text Void) Expr
-parseExpression s = evalState (runParserT parseExpr "User input" (T.filter (/=' ' ) s)) ([], [])
-
-    --lift put fs >> Function <$> parseName <*> (char '(' *> parseParams <* char ')' <* char '=') <*> parseExpr
-
-parseName :: Parser Text 
-parseName = T.pack <$> many1 letter
-
-parseParams :: Parser [Parameter]
-parseParams = (do
-        p <- T.pack <$> many1 letter
-        (_, ps) <- lift get
-        if elem p ps then failT ("Repeat instance of parameter " <> p)
-        else lift (modify (fmap (p:))) *> fmap (p :) parseParams
-  ) <|> char ',' *> parseParams
-    <|> pure []
 
 parseExpr :: Parser Expr
 parseExpr = USub <$> (char '-' *> parseExpr)
@@ -105,9 +79,6 @@ parseVar = do
 parseParam :: Parser String
 parseParam = many1 letter
 
-letter :: Parser Char
-letter = oneOf (['a'..'z'] ++ ['A'..'Z'] ++ ['α', 'β', 'γ', 'δ', 'ε', 'ζ', 'η', 'θ', 'ι', 'κ', 'λ', 'μ', 'ν', 'ξ', 'ρ', 'σ', 'ς', 'τ', 'υ', 'φ', 'χ', 'ψ', 'ω', 'א'])
-
 parseNum :: Parser Expr
 parseNum = try (Num <$> parseCyclotomic)
        <|> try (char '(' *> parseExpr <* char ')')
@@ -120,37 +91,16 @@ parseFunctionCall :: Parser Expr
 parseFunctionCall = try (Log (Num e) <$> ((string "log" <|> string "Log" <|> string "ln" <|> string "Ln") *> char '(' *> parseExpr <* char ')')) --log med e som base
        <|> try (Log <$> ((string "log" <|> string "Log") *> (char '[' *> parseExpr <* char ']' <|> fmap Num parseCyclotomic)) <*> (char '(' *> parseExpr <* char ')')) -- log med custom base
        <|> (do
-            name <- T.pack <$> many1 letter   
+            name <- T.pack <$> many1 letter
             (fs, _) <- lift get
             case [ f | f@(Function fname _ _)<-fs, name == fname ] of
                 [] -> failT ("Unrecognized function: " <> name)
                 (Function fname params ex:_) -> do
                     char '('
-                    args <- replicateM (length params) (tryWhatever (char ',') parseExpr) 
+                    args <- replicateM (length params) (tryWhatever (char ',') parseExpr)
                     char ')'
                     pure (betaReduce ex (zip params args))
        )
 
 
-parseCyclotomic :: Parser RealCyclotomic
-parseCyclotomic = do
-    before <- withDefault (T.pack <$> many digit) "0"
-    comma  <- withDefault (string ".") ""
-    after  <- withDefault (T.pack <$> many digit) "0"
-    case double (before <> comma <> after) of
-        Left err      -> fail err
-        Right  (n, _) -> pure (realToRat n)
-
-digit :: Parser Char
-digit = oneOf ['0'..'9']
-
-withDefault :: Parser a -> a -> Parser a
-withDefault rule default' = try rule <|> pure default'
-
--- Gjør den første regelen, og bryr seg ikke om den feiler eller ikke før den tar den neste regelen.
-tryWhatever :: Parser a -> Parser b -> Parser b
-tryWhatever ignore rule = (try ignore *> rule) <|> rule
-
-many1 :: Parser a -> Parser [a]
-many1 a = (:) <$> a <*> many a
 

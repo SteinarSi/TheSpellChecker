@@ -18,6 +18,3 @@ e = 2.71828182845904523536028747
 
 pi :: RealCyclotomic
 pi = realToFrac P.pi
-
-failT :: MonadFail m => Text -> m a
-failT = fail . unpack

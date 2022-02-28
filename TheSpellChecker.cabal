@@ -27,7 +27,10 @@ library
   exposed-modules:
       Calculus
       Expr
-      Parser
+      Interpreter
+      ParseExpr
+      ParseREPL
+      ParserUtility
       Utility
   other-modules:
       Paths_TheSpellChecker

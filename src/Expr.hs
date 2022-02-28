@@ -7,7 +7,7 @@ module Expr (Expr(..), Argument, Parameter, Function(Function), evalConstant, ev
 
 import Data.Number.RealCyclotomic (RealCyclotomic, toReal, toRat)
 import Data.Text (Text, unpack, pack)
-import Data.List (intersperse)
+import Data.List (intercalate)
 
 import TextShow (TextShow(..), showbParen, showb, fromText, toText, toString)
 import Utility (realToRat)
@@ -31,7 +31,7 @@ type Parameter = Text
 data Function = Function Text [Parameter] Expr
 
 instance Show Function where
-    show (Function name params expr) = unpack name <> "(" <> concat (intersperse "," (map unpack params)) <> ")=" <> toString (showb expr)
+    show (Function name params expr) = unpack name <> "(" <> intercalate "," (map unpack params) <> ")=" <> toString (showb expr)
 
 instance TextShow Expr where
     showbPrec p (Num  a)    = showb a
@@ -59,9 +59,9 @@ betaReduce (Div a b) args = Div (betaReduce a args) (betaReduce b args)
 betaReduce (Expo a b) args = Expo (betaReduce a args) (betaReduce b args)
 betaReduce (Log a b) args = Log (betaReduce a args) (betaReduce b args)
 
-isConstant :: Expr -> Bool 
-isConstant (Var _) = False 
-isConstant (Num _) = True 
+isConstant :: Expr -> Bool
+isConstant (Var _) = False
+isConstant (Num _) = True
 isConstant (Add a b) = isConstant a && isConstant b
 isConstant (BSub a b) = isConstant a && isConstant b
 isConstant (USub a) = isConstant a
@@ -83,11 +83,11 @@ evalConstant (Log a b) = realToRat $ logBase (toReal (evalConstant a)) (toReal (
 evalConstant (Expo a b) = realToRat $ toReal (evalConstant a) ** toReal (evalConstant b)
 
 
-evalFunction :: Function -> [Argument] -> Either Text RealCyclotomic 
+evalFunction :: Function -> [Argument] -> Either Text RealCyclotomic
 evalFunction (Function _ params ex) args | params == map fst args = Right $ evalFunction' ex args
                                          | otherwise = Left ("Function arguments did not match function parameters: " <> toText (showb (map fst args)) <> " vs " <> toText (showb params))
     where
-        evalFunction' :: Expr -> [Argument] -> RealCyclotomic 
+        evalFunction' :: Expr -> [Argument] -> RealCyclotomic
         evalFunction' (Var v) params = head [ value | (name, value) <- params, v == name ]
         evalFunction' (Num a) _ = a
         evalFunction' (Add a b) params = evalFunction' a params + evalFunction' b params

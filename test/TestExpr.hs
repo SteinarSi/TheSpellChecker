@@ -16,8 +16,8 @@ testExpr :: Test
 testExpr = TestList [noParensNecessary, parensNecessary]
 
 noParensNecessary, parensNecessary :: Test
-noParensNecessary = TestCase (assertEqual "2+3*4" "2+3*4" (toString (showb (fromRight (parseExpression "2+3*4")))))
-parensNecessary = TestCase (assertEqual "(2+3)*4" "(2+3)*4" (toString (showb (fromRight (parseExpression "(2+3)*4")))))
+noParensNecessary = TestCase (assertEqual "2+3*4" "2+3*4" (toString (showb (fromRight (parse parseExpr [] "2+3*4")))))
+parensNecessary = TestCase (assertEqual "(2+3)*4" "(2+3)*4" (toString (showb (fromRight (parse parseExpr [] "(2+3)*4")))))
 
 
 
