@@ -3,7 +3,7 @@
 
 {-# LANGUAGE OverloadedStrings #-}
 
-module Expr (Expr(..), Argument, Parameter, Function(Function), evalConstant, evalFunction, betaReduce) where
+module Expr (Expr(..), Argument, Parameter, Function(Function), isConstant, evalConstant, evalFunction, betaReduce) where
 
 import Data.Number.RealCyclotomic (RealCyclotomic, toReal, toRat)
 import Data.Text (Text, unpack, pack)
