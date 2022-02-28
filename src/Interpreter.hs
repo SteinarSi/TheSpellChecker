@@ -5,6 +5,8 @@ module Interpreter where
 import qualified Data.Text as T
 
 
+import Data.Either (either)
+
 import Expr
 import ParseExpr
 import ParseREPL
@@ -18,7 +20,4 @@ loop fs = do
         Right ex -> case ex of
             Help -> putStrLn "There is no help to be found here yet"
             NewFunction f -> putStrLn ("I parsed the function like this: " ++ show f) >> loop (f:fs)
-            EvalFunction f args -> case evalFunction f args of
-                Left err -> print err
-                Right  n -> putStrLn (inn ++ " = " ++ show n) >> loop fs
-            
+            EvalFunction f args -> either (putStrLn . T.unpack) (\n -> putStrLn (inn ++ " = " ++ show n)) (evalFunction f args) >> loop fs
