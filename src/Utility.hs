@@ -35,7 +35,7 @@ instance Floating RealCyclotomic where
 
 
 
--- Dette er ren juks. Jeg kan ta all Floating-operasjoner på cyclotomiske tall bare ved
+-- Dette er ren juks. Jeg kan ta alle Floating-operasjoner på cyclotomiske tall bare ved
 --  å eksportere tallene ineksakt frem og tilbake. Dette gjør at mange av operasjonene
 --  ikke blir helt nøyaktige, men det er fortsatt bedre enn å bare bruke Floats.
 cheat :: (RealFloat b, Real a, Fractional c) => (b -> a) -> RealCyclotomic -> c

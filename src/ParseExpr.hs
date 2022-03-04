@@ -18,7 +18,7 @@ import Control.Monad (replicateM)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.State (State, get, runState, evalState, modify)
 
-import Expr (Expr(..), Function(Function), Parameter, betaReduce)
+import Expr
 import Utility
 import ParserUtility
 
@@ -45,7 +45,7 @@ Letter       => a | b | c | .... | z | A | B | ... | Z | α | β | ... | ω     
 
 
 parseExpr :: Parser Expr
-parseExpr = USub <$> (char '-' *> parseExpr)
+parseExpr = UFunc USub <$> (char '-' *> parseExpr)
         <|> foldl' (&) <$> parseTerm <*> parseTermList
 
 parseTerm :: Parser Expr
@@ -53,17 +53,17 @@ parseTerm = foldl' (&) <$> parseFactor <*> parseFactorList
 
 -- Lager en liste på formen [ +term, -term, -term, +term ], som kan settes sammen venstreassosiativt med en initiell term.
 parseTermList :: Parser [Expr -> Expr]
-parseTermList = fmap ((:) . flip Add)  (char '+' *> parseTerm) <*> parseTermList
-            <|> fmap ((:) . flip BSub) (char '-' *> parseTerm) <*> parseTermList
+parseTermList = fmap ((:) . flip (BFunc (Infix Add)))  (char '+' *> parseTerm) <*> parseTermList
+            <|> fmap ((:) . flip (BFunc (Infix BSub))) (char '-' *> parseTerm) <*> parseTermList
             <|> pure []
 
 parseFactor :: Parser Expr
-parseFactor = parseNum >>= \n -> Expo n <$> (char '^' *> parseFactor) <|> pure n
+parseFactor = parseNum >>= \n -> BFunc (Infix Expo) n <$> (char '^' *> parseFactor) <|> pure n
 
 -- Lager en liste på formen [ *faktor, /faktor, *faktor ], som kan settes sammen venstreassosiativt med en initiell faktor
 parseFactorList :: Parser [Expr -> Expr]
-parseFactorList = fmap ((:) . flip Mult) ((char '*' *> parseFactor) <|> parseFactor) <*> parseFactorList
-              <|> fmap ((:) . flip Div)  (char '/' *> parseFactor) <*> parseFactorList
+parseFactorList = fmap ((:) . flip (BFunc (Infix Mult))) ((char '*' *> parseFactor) <|> parseFactor) <*> parseFactorList
+              <|> fmap ((:) . flip (BFunc (Infix Div )))  (char '/' *> parseFactor) <*> parseFactorList
               <|> pure []
 
 parseVar :: Parser Expr
@@ -85,8 +85,8 @@ parseNum = try (Num <$> parseCyclotomic)
        <|> parseFunctionCall
 
 parseFunctionCall :: Parser Expr
-parseFunctionCall = try (Log (Num e) <$> ((string "log" <|> string "Log" <|> string "ln" <|> string "Ln") *> char '(' *> parseExpr <* char ')')) --log med e som base
-       <|> try (Log <$> ((string "log" <|> string "Log") *> (char '[' *> parseExpr <* char ']' <|> fmap Num parseCyclotomic)) <*> (char '(' *> parseExpr <* char ')')) -- log med custom base
+parseFunctionCall = try (BFunc (Prefix Log) (Num e) <$> ((string "log" <|> string "Log" <|> string "ln" <|> string "Ln") *> char '(' *> parseExpr <* char ')')) --log med e som base
+       <|> try (BFunc (Prefix Log) <$> ((string "log" <|> string "Log") *> (char '[' *> parseExpr <* char ']' <|> fmap Num parseCyclotomic)) <*> (char '(' *> parseExpr <* char ')')) -- log med custom base
        <|> (do
             name <- T.pack <$> many1 letter
             (fs, _) <- lift get
@@ -98,6 +98,7 @@ parseFunctionCall = try (Log (Num e) <$> ((string "log" <|> string "Log" <|> str
                     char ')'
                     pure (betaReduce ex (zip params args))
        )
+
 
 
 
