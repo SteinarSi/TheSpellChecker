@@ -21,12 +21,17 @@ data Expr = Add Expr Expr
           | Div Expr Expr
           | Log Expr Expr -- logf(g), der både f og g er funksjoner gitt av noen parametre
           | Expo Expr Expr
+           -- | UFunc UnaryFunction Expr
+          -- | BFunc BinaryFunctio Expr Expr
           | Num RealCyclotomic
           | Var Text
     deriving (Show, Eq)
 
 type Argument = (Text, RealCyclotomic)
 type Parameter = Text
+
+--data UnaryFunction = Sin | Cos | Tan | Sqrt
+--data BinaryFunctin = Log
 
 data Function = Function Text [Parameter] Expr
 
@@ -95,5 +100,7 @@ evalFunction (Function _ params ex) args | params == map fst args = Right $ eval
         evalFunction' (USub a) params = - evalFunction' a params
         evalFunction' (Mult a b) params = evalFunction' a params * evalFunction' b params
         evalFunction' (Div a b) params = evalFunction' a params / evalFunction' b params
-        evalFunction' (Log a b) params = realToRat $ logBase (toReal (evalFunction' a params)) (toReal (evalFunction' b params))
-        evalFunction' (Expo a b) params = realToRat $ toReal (evalFunction' a params) ** toReal (evalFunction' b params)
+        evalFunction' (Log a b) params = logBase (evalFunction' a params) (evalFunction' b params)
+        evalFunction' (Expo a b) params = evalFunction' a params ** evalFunction' b params
+
+

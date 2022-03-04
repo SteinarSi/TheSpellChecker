@@ -14,9 +14,6 @@ import Data.Function ((&))
 import Data.List (foldl')
 import Data.Number.RealCyclotomic (RealCyclotomic)
 
-import Prelude hiding (pi)
-import qualified Prelude as P
-
 import Control.Monad (replicateM)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.State (State, get, runState, evalState, modify)
