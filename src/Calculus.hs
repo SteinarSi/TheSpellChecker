@@ -1,3 +1,7 @@
+
+
+
+
 module Calculus where
 
 
@@ -11,11 +15,69 @@ import Utility
 
 
 
-differentiate :: Expr -> Text -> Expr
-differentiate expr x = simplify (diff (simplify expr) x)
+differentiate :: Expr -> Text -> Either Text Expr
+differentiate expr x = fmap simplify (diff (simplify expr) x)
 
 
 
+diff :: Expr -> Text -> Either Text Expr
+
+-- a' = 0
+diff (Num n) _ = Right (Num 0)
+
+-- x' = 1, y' = 0
+diff (Var v) x | v == x = Right (Num 1)
+               | otherwise = Right (Num 0)
+
+-- (f + g)' = f' + g'
+diff (BFunc (Infix Add) a b) x = BFunc (Infix Add) <$> diff a x <*> diff b x
+
+-- (f - g)' = f' - g'
+diff (BFunc (Infix BSub) a b) x = BFunc (Infix BSub) <$> diff a x <*> diff b x
+
+-- (-f)' = -f'
+diff (UFunc USub a) x = UFunc USub <$> diff a x
+
+-- sin(f)' = cos(x) * f'
+diff (UFunc Sin a) x = BFunc (Infix Mult) (UFunc Cos a) <$> diff a x
+
+-- cos(f)' = - sin(x) * f'
+diff (UFunc Cos a) x = BFunc (Infix Mult) (UFunc USub (UFunc Sin a)) <$> diff a x
+
+-- tan(f)' = f'/cos^2(f)
+diff (UFunc Tan a) x = BFunc (Infix Div) <$> diff a x <*> Right (BFunc (Infix Expo) (UFunc Cos a) (Num 2))
+
+-- (f * g)' = f' * g + f * g'
+diff (BFunc (Infix Mult) a b) x = BFunc (Infix Add) <$> (BFunc (Infix Mult) <$> diff a x <*> Right b) <*> (BFunc (Infix Mult) a <$> diff b x)
+
+-- (f / g)' = (f' * g - f * g') / g^2
+diff (BFunc (Infix Div) f g) x = BFunc (Infix Div) <$> 
+    (BFunc (Infix BSub) <$> 
+        (BFunc (Infix Mult) <$> diff f x <*> Right g) <*> 
+        (BFunc (Infix Mult) f <$> diff g x)) <*> 
+    Right (BFunc (Infix Expo) g (Num 2))
+
+-- (f^g)' = (f^g)*(f'*g/f + g'*ln(f))                                                                                                                                           -- (f^g)' = (f^g)*(f'*g/f + g'*ln(f))
+diff (BFunc (Infix Expo) f g) x = BFunc (Infix Mult) 
+        (BFunc (Infix Expo) f g) <$> 
+        (BFunc (Infix Add) <$> 
+            (BFunc (Infix Div) <$> (BFunc (Infix Mult) <$> diff f x <*> Right g) <*> Right f) <*> 
+            (BFunc (Infix Mult) <$> diff g x <*> Right (BFunc (Prefix Log) (Num e) f)))
+
+-- (ln(g))' = (ln(g))' / g
+diff (BFunc (Prefix Log) f g) x | f == Num e = BFunc (Infix Div) <$> diff g x <*> Right g
+
+                            -- logf(g)' = (g'*ln(f)/g - ln(g)*f'/f) / (ln(f))^2
+                                | otherwise = BFunc (Infix Div) <$> 
+                                    (BFunc (Infix BSub) <$> 
+                                        (BFunc (Infix Div) <$> (BFunc (Infix Mult) <$> diff g x <*> Right (BFunc (Prefix Log) (Num e) f)) <*> Right g) <*> 
+                                        (BFunc (Infix Div) <$> (BFunc (Infix Mult) (BFunc (Prefix Log) (Num e) g) <$> diff f x) <*> Right f)) <*> 
+                                    Right (BFunc (Infix Expo) (BFunc (Prefix Log) (Num e) f) (Num 2))
+
+
+diff _ _ = undefined 
+
+{-
 -- TODO: teste denne sjiten
 diff :: Expr -> Text -> Expr
 diff (Num n) _ = Num 0                                                                                              -- a' = 0
@@ -34,7 +96,7 @@ diff (BFunc (Prefix Log) f g) x | f == Num e = BFunc (Infix Div) (diff g x) g   
                  | otherwise  = BFunc (Infix Div) (BFunc (Infix BSub) (BFunc (Infix Mult) (BFunc (Infix Div) (diff g x) g) (BFunc (Prefix Log) (Num e) f)) (BFunc (Infix Mult) (BFunc (Prefix Log) (Num e) g) (BFunc (Infix Div) (diff f x) f))) (BFunc (Infix Expo) (BFunc (Prefix Log) (Num e) f) (Num 2))    
                                                                                                                     -- logf(g)' = (g'*ln(f)/g - ln(g)*f'/f) / (ln(f))^2
 
-
+-}
 
 -- TODOOOO
 simplify :: Expr -> Expr

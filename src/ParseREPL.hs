@@ -18,12 +18,16 @@ import ParserUtility
 import ParseExpr
 
 
+(%) = mod
+
 data Command = NewFunction Function
              | EvalFunction Function [Argument]
+             | Quit
              | Help
 
 parseCommand :: Parser Command
 parseCommand = try (Help <$ (string "help" <|> string "Help"))
+           <|> try (Quit <$ (string "quit" <|> string "q" <|> string "Quit"))
            <|> try (NewFunction <$> (Function <$> parseName <*> (char '(' *> parseParams <* char ')' <* char '=') <*> parseExpr))
            <|> (do
                name <- parseName

@@ -2,7 +2,7 @@
 --A Step-by-Step Solution Methodology for Mathematical Expressions 
 
 {-# LANGUAGE OverloadedStrings #-}
-{-# OPTIONS_GHC -Wno-overlapping-patterns #-}
+-- {-# OPTIONS_GHC -Wno-overlapping-patterns #-}
 
 module Expr (Expr(..), Argument, Parameter, Function(Function), UnaryFunction(..), BinaryFunction(..), PrefixFunction(..), InfixFunction(..), bFunctions, bFuncFromName, isConstant, evalConstant, evalFunction, betaReduce) where
 
@@ -27,13 +27,16 @@ data Expr = UFunc UnaryFunction Expr
 type Argument = (Text, RealCyclotomic)
 type Parameter = Text
 
-data UnaryFunction = Sin | Cos | Tan | USub
+data UnaryFunction = Sin | Cos | Tan | USub -- | Ceiling | Floor
     deriving (Eq, Show)
+
 data BinaryFunction = Prefix PrefixFunction
                     | Infix  InfixFunction
     deriving (Eq, Show)
-data PrefixFunction = Log
+
+data PrefixFunction = Log -- | Max | Min
     deriving (Eq, Show)
+
 data InfixFunction  = Add | BSub | Mult | Div | Expo
     deriving (Eq, Show)
 
@@ -52,7 +55,9 @@ bFunctions = [
         (Infix Mult, "*", (*)),
         (Infix Div, "/", (/)),
         (Prefix Log, "log", logBase),
-        (Infix Expo, "^", (**))
+        (Infix Expo, "^", (**)) --,
+        -- (Prefix Max, "max", \x y -> realToRat $ max (toReal x) (toReal y)),
+        -- (Prefix Min, "min", \x y -> realToRat $ min (toReal x) (toReal y))
     ]
 
 infixPrecedence :: InfixFunction -> Int
@@ -122,7 +127,6 @@ evalFunction (Function _ params ex) args | params == map fst args = Right $ eval
         evalFunction' :: Expr -> [Argument] -> RealCyclotomic
         evalFunction' (Var v) params = head [ value | (name, value) <- params, v == name ]
         evalFunction' (Num a) _ = a
-        evalConstant (UFunc c a) params = let (_, _, f) = uFuncFromConstr c in f (evalConstant a params)
-        evalConstant (BFunc c a b) params = let (_, _, f) = bFuncFromConst c in f (evalConstant a params) (evalConstant b params)
-
+        evalFunction' (UFunc c a) params = let (_, _, f) = uFuncFromConstr c in f (evalFunction' a params)
+        evalFunction' (BFunc c a b) params = let (_, _, f) = bFuncFromConst c in f (evalFunction' a params) (evalFunction' b params)
 
