@@ -7,6 +7,7 @@ module ParseREPL where
 import Data.Number.RealCyclotomic
 import Data.Text (Text)
 import qualified Data.Text as T
+import TextShow (TextShow)
 import Text.Megaparsec ((<|>), try, eof, many)
 import Text.Megaparsec.Char (char, string)
 import Control.Monad.State.Lazy (get, put, modify)
@@ -18,14 +19,13 @@ import ParserUtility
 import ParseExpr
 
 
-(%) = mod
 
-data Command = NewFunction Function
-             | EvalFunction Function [Argument]
-             | Quit
-             | Help
+data Command n = NewFunction (Function n)
+               | EvalFunction (Function n) [Argument n]
+               | Quit
+               | Help
 
-parseCommand :: Parser Command
+parseCommand :: (RealFloat n, Show n, TextShow n) => Parser n (Command n)
 parseCommand = try (Help <$ (string "help" <|> string "Help"))
            <|> try (Quit <$ (string "quit" <|> string "q" <|> string "Quit"))
            <|> try (NewFunction <$> (Function <$> parseName <*> (char '(' *> parseParams <* char ')' <* char '=') <*> parseExpr))
@@ -39,18 +39,16 @@ parseCommand = try (Help <$ (string "help" <|> string "Help"))
                eof
                pure (EvalFunction f (zip params a)))
 
-    where args = fmap (:) parseConstant  <*>  (char ',' *> args ) <|> pure []
-
-parseConstant :: Parser RealCyclotomic 
+parseConstant :: (RealFloat n, Show n, TextShow n) => Parser n n
 parseConstant = do
     e <- parseExpr 
     if isConstant e then pure (evalConstant e)
     else fail "Function argument has to be a constant expression"
 
-parseName :: Parser Text
+parseName :: Parser n Text
 parseName = T.pack <$> many1 letter
 
-parseParams :: Parser [Parameter]
+parseParams :: (RealFloat n, Show n, TextShow n) => Parser n [Parameter]
 parseParams = (do
         p <- T.pack <$> many1 letter
         (_, ps) <- lift get

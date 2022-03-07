@@ -8,6 +8,7 @@ import Text.Megaparsec.Char (char, string)
 import Data.Void (Void)
 import qualified Data.Text as T
 import Data.Text (Text)
+import TextShow (TextShow)
 import Text.Read (readMaybe)
 import Data.Functor (($>))
 import Data.Function ((&))
@@ -44,50 +45,50 @@ Letter       => a | b | c | .... | z | A | B | ... | Z | α | β | ... | ω     
 
 
 
-parseExpr :: Parser Expr
+parseExpr :: (RealFloat n, Show n, TextShow n) => Parser n (Expr n)
 parseExpr = UFunc USub <$> (char '-' *> parseExpr)
         <|> foldl' (&) <$> parseTerm <*> parseTermList
 
-parseTerm :: Parser Expr
+parseTerm :: (RealFloat n, Show n, TextShow n) => Parser n (Expr n)
 parseTerm = foldl' (&) <$> parseFactor <*> parseFactorList
 
 -- Lager en liste på formen [ +term, -term, -term, +term ], som kan settes sammen venstreassosiativt med en initiell term.
-parseTermList :: Parser [Expr -> Expr]
+parseTermList :: (RealFloat n, Show n, TextShow n) => Parser n [Expr n -> Expr n]
 parseTermList = fmap ((:) . flip (BFunc (Infix Add)))  (char '+' *> parseTerm) <*> parseTermList
             <|> fmap ((:) . flip (BFunc (Infix BSub))) (char '-' *> parseTerm) <*> parseTermList
             <|> pure []
 
-parseFactor :: Parser Expr
+parseFactor :: (RealFloat n, Show n, TextShow n) => Parser n (Expr n)
 parseFactor = parseNum >>= \n -> BFunc (Infix Expo) n <$> (char '^' *> parseFactor) <|> pure n
 
 -- Lager en liste på formen [ *faktor, /faktor, *faktor ], som kan settes sammen venstreassosiativt med en initiell faktor
 -- Dette tillater også å droppe gangetegnet i uttrykk, f. eks. 2(3+4) = 2*(3+4).
-parseFactorList :: Parser [Expr -> Expr]
+parseFactorList :: (RealFloat n, Show n, TextShow n) => Parser n [Expr n -> Expr n]
 parseFactorList = fmap ((:) . flip (BFunc (Infix Mult))) ((char '*' *> parseFactor) <|> parseFactor) <*> parseFactorList
               <|> fmap ((:) . flip (BFunc (Infix Div )))  (char '/' *> parseFactor) <*> parseFactorList
               <|> pure []
 
-parseVar :: Parser Expr
+parseVar :: Parser n (Expr n)
 parseVar = do
     var <- T.pack <$> many1 letter
     (_, ps) <- lift get -- look at me, I understand monad transformers now!
     if var `elem` ps then pure (Var var)
     else failT ("Unrecognized variable name: " <> var)
 
-parseParam :: Parser String
+parseParam :: Parser n String
 parseParam = many1 letter
 
-parseNum :: Parser Expr
-parseNum = try (Num <$> parseCyclotomic)
+parseNum :: (RealFloat n, Show n, TextShow n) => Parser n (Expr n)
+parseNum = try (Num <$> parseRealFloat)
        <|> try (char '(' *> parseExpr <* char ')')
        <|> try parseVar
        <|> char 'e' $> Num e
        <|> try (string "pi" <|> string "Pi" <|> string "π") $> Num pi
        <|> parseFunctionCall
 
-parseFunctionCall :: Parser Expr
+parseFunctionCall :: (RealFloat n, Show n, TextShow n) => Parser n (Expr n)
 parseFunctionCall = try (BFunc (Prefix Log) (Num e) <$> ((string "log" <|> string "Log" <|> string "ln" <|> string "Ln") *> char '(' *> parseExpr <* char ')')) --log med e som base
-       <|> try (BFunc (Prefix Log) <$> ((string "log" <|> string "Log") *> (char '[' *> parseExpr <* char ']' <|> fmap Num parseCyclotomic)) <*> (char '(' *> parseExpr <* char ')')) -- log med custom base
+       <|> try (BFunc (Prefix Log) <$> ((string "log" <|> string "Log") *> (char '[' *> parseExpr <* char ']' <|> fmap Num parseRealFloat)) <*> (char '(' *> parseExpr <* char ')')) -- log med custom base
        <|> try (do
             name <- first [ try (string fname) | (_, fname, _) <- uFunctions, fname /= "-"]
             let Just (c, _, _) = uFuncFromName name

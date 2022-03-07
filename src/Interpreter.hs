@@ -6,13 +6,15 @@ import qualified Data.Text as T
 
 
 import Data.Either (either)
+import Data.Number.CReal
 
 import Expr
 import ParseExpr
 import ParseREPL
 
 
-loop :: [Function] -> IO ()
+
+loop :: [Function CReal] -> IO ()
 loop fs = do
     inn <- getLine
     case parse parseCommand fs (T.pack inn) of 

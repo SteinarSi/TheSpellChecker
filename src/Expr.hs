@@ -14,19 +14,20 @@ import Data.List (intercalate)
 import TextShow (TextShow(..), showbParen, showb, fromText, toText, toString)
 import Data.Maybe (listToMaybe)
 
-
 import Utility (realToRat, e)
 
 
 -- 2 + 3 * 4^5 = Add (Num 2) (Mult (Num 3) (Expo (Num 4) (Num 5)))
 
-data Expr = UFunc UnaryFunction Expr
-          | BFunc BinaryFunction Expr Expr
-          | Num RealCyclotomic
-          | Var Text
+data Expr n = UFunc UnaryFunction (Expr n)
+            | BFunc BinaryFunction (Expr n) (Expr n)
+            | Num n
+            | Var Text
     deriving (Show, Eq)
 
-type Argument = (Text, RealCyclotomic)
+data Function n = Function Text [Parameter] (Expr n)
+
+type Argument n = (Text, n)
 type Parameter = Text
 
 data UnaryFunction = Sin | Cos | Tan | USub -- | Ceiling | Floor
@@ -42,7 +43,7 @@ data PrefixFunction = Log -- | Max | Min
 data InfixFunction  = Add | BSub | Mult | Div | Expo
     deriving (Eq, Show)
 
-uFunctions :: [(UnaryFunction, Text, RealCyclotomic -> RealCyclotomic)]
+uFunctions :: RealFloat n => [(UnaryFunction, Text, n -> n)]
 uFunctions = [
         (Sin, "sin", sin),
         (Cos, "cos", cos),
@@ -50,7 +51,7 @@ uFunctions = [
         (USub, "-", negate)
     ]
 
-bFunctions :: [(BinaryFunction, Text, RealCyclotomic -> RealCyclotomic -> RealCyclotomic)]
+bFunctions :: RealFloat n => [(BinaryFunction, Text, n -> n -> n)]
 bFunctions = [
         (Infix Add, "+", (+)),
         (Infix BSub, "-", (-)),
@@ -75,25 +76,23 @@ uFuncNames = [name | (_, name, _) <- uFunctions]
 bFuncNames :: [Text]
 bFuncNames = [name | (_, name, _) <- bFunctions]
 
-uFuncFromName :: Text -> Maybe (UnaryFunction, Text, RealCyclotomic -> RealCyclotomic)
+uFuncFromName :: RealFloat n => Text -> Maybe (UnaryFunction, Text, n -> n)
 uFuncFromName t = listToMaybe [ f | f@(con, name, func) <- uFunctions, name == toLower t ]
 
-bFuncFromName :: Text-> Maybe (BinaryFunction, Text, RealCyclotomic -> RealCyclotomic -> RealCyclotomic)
+bFuncFromName :: RealFloat n => Text-> Maybe (BinaryFunction, Text, n -> n -> n)
 bFuncFromName t = listToMaybe [ f | f@(con, name, func) <- bFunctions, name == toLower t ]
 
-uFuncFromConstr :: UnaryFunction -> (UnaryFunction, Text, RealCyclotomic -> RealCyclotomic)
+uFuncFromConstr :: RealFloat n => UnaryFunction -> (UnaryFunction, Text, n -> n)
 uFuncFromConstr c = head [ f | f@(con, name, func) <- uFunctions, con == c ]
 
-bFuncFromConst :: BinaryFunction -> (BinaryFunction, Text, RealCyclotomic -> RealCyclotomic -> RealCyclotomic)
+bFuncFromConst :: RealFloat n => BinaryFunction -> (BinaryFunction, Text, n -> n -> n)
 bFuncFromConst c = head [ f | f@(con, name, func) <- bFunctions, con == c ]
 
 
-data Function = Function Text [Parameter] Expr
-
-instance Show Function where
+instance (RealFloat n, TextShow n) => Show (Function n) where
     show (Function name params expr) = unpack name <> "(" <> intercalate "," (map unpack params) <> ") = " <> toString (showb expr)
 
-instance TextShow Expr where
+instance (RealFloat n, TextShow n) => TextShow (Expr n) where
     showbPrec p (Num  a)    = showb a
     showbPrec p (Var v)     = fromText v
     showbPrec p (UFunc USub a) = showbParen (5 < p) ("-" <> showbPrec 5 a)
@@ -110,30 +109,30 @@ instance TextShow RealCyclotomic where
     showb = fromText . pack . show
 
 -- erstatter alle variabler med sin nye verdi.
-betaReduce :: Expr -> [(Text, Expr)] -> Expr
+betaReduce :: Expr n -> [(Text, Expr n)] -> Expr n
 betaReduce (Var v) args = head [ value | (name, value) <- args, v == name ]
 betaReduce (Num n) args = Num n
 betaReduce (UFunc c a) args = UFunc c (betaReduce a args)
 betaReduce (BFunc c a b) args = BFunc c (betaReduce a args) (betaReduce b args)
 
-isConstant :: Expr -> Bool
+isConstant :: Expr n -> Bool
 isConstant (Var _) = False
 isConstant (Num _) = True
 isConstant (UFunc _ a) = isConstant a
 isConstant (BFunc _ a b) = isConstant a && isConstant b
 
 -- Kræsjer om uttrykket ikke er en konstant.
-evalConstant :: Expr -> RealCyclotomic
+evalConstant :: RealFloat n => Expr n -> n
 evalConstant (Var _) = error "Unexpected variable in 'constant'"
 evalConstant (Num a) = a
 evalConstant (UFunc c a) = let (_, _, f) = uFuncFromConstr c in f (evalConstant a)
 evalConstant (BFunc c a b) = let (_, _, f) = bFuncFromConst c in f (evalConstant a) (evalConstant b)
 
-evalFunction :: Function -> [Argument] -> Either Text RealCyclotomic
+evalFunction :: RealFloat n => Function n -> [Argument n] -> Either Text n
 evalFunction (Function _ params ex) args | params == map fst args = Right $ evalFunction' ex args
                                          | otherwise = Left ("Function arguments did not match function parameters: " <> toText (showb (map fst args)) <> " vs " <> toText (showb params))
     where
-        evalFunction' :: Expr -> [Argument] -> RealCyclotomic
+        evalFunction' :: RealFloat n => Expr n -> [Argument n] -> n
         evalFunction' (Var v) params = head [ value | (name, value) <- params, v == name ]
         evalFunction' (Num a) _ = a
         evalFunction' (UFunc c a) params = let (_, _, f) = uFuncFromConstr c in f (evalFunction' a params)

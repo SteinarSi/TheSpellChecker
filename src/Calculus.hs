@@ -6,6 +6,7 @@ module Calculus where
 
 
 import Data.Text (Text)
+import TextShow (TextShow)
 
 
 
@@ -15,12 +16,12 @@ import Utility
 
 
 
-differentiate :: Expr -> Text -> Either Text Expr
+differentiate :: (RealFloat n, Show n, TextShow n) => Expr n -> Text -> Either Text (Expr n)
 differentiate expr x = fmap simplify (diff (simplify expr) x)
 
 
 
-diff :: Expr -> Text -> Either Text Expr
+diff :: (RealFloat n, Show n, TextShow n) => Expr n -> Text -> Either Text (Expr n)
 
 -- a' = 0
 diff (Num n) _ = Right (Num 0)
@@ -101,5 +102,5 @@ diff (BFunc (Prefix Log) f g) x | f == Num e = BFunc (Infix Div) (diff g x) g   
 -}
 
 -- TODOOOO
-simplify :: Expr -> Expr
+simplify :: Expr n -> Expr n
 simplify = id

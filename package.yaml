@@ -28,6 +28,7 @@ dependencies:
 - mtl
 - text-show
 - HUnit
+- numbers
 
 library:
   source-dirs: src
