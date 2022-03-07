@@ -20,7 +20,7 @@ loop fs = do
     case parse parseCommand fs (T.pack inn) of 
         Left err -> print err >> loop fs
         Right ex -> case ex of
-            Help -> putStrLn "There is no help to be found here yet" >> loop fs
+            Help -> readFile "data/help.txt" >>= putStrLn >> loop fs
             Quit -> putStrLn "Bye-bye!"
             NewFunction f -> putStrLn ("I parsed the function like this: " ++ show f) >> loop (f:fs)
             EvalFunction f args -> either (putStrLn . T.unpack) (\n -> putStrLn (inn ++ " = " ++ show n)) (evalFunction f args) >> loop fs

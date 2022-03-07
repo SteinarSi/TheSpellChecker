@@ -1,1 +1,12 @@
-There is no help to be found here yet
+
+Some commands:
+
+Define a new function:
+f(x1, x2, .... xn) = <expr>
+
+Evaluate a function:
+f(a1, a2, .... a3)
+
+Show a function:
+f
+

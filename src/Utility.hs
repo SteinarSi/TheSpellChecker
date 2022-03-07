@@ -16,6 +16,10 @@ realToRat = fromRational . realToFrac
 e :: (RealFloat n, TextShow n) => n
 e = 2.71828182845904523536028747
 
+applyNtimesM :: Monad m => Int -> (a -> m a) -> a -> m a 
+applyNtimesM 0 _ a = pure a
+applyNtimesM n f a = f a >>= applyNtimesM (n-1) f
+
 
 instance TextShow CReal where
     showb = fromString . showCReal 3

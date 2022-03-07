@@ -18,6 +18,8 @@ import Expr
 import ParserUtility
 import ParseExpr
 import ParserUtility (tryWhatever)
+import Calculus (differentiate)
+import Utility (applyNtimesM)
 
 
 
@@ -28,25 +30,34 @@ data Command n = NewFunction (Function n)
                | Help
 
 parseCommand :: (RealFloat n, Show n, TextShow n) => Parser n (Command n)
-parseCommand = try (Help <$ (string "help" <|> string "Help"))
+parseCommand = try (Help <$ (string "help" <|> string "Help" <|> string "h"))   
            <|> try (Quit <$ (string "quit" <|> string "q" <|> string "Quit"))
-           <|> try (NewFunction <$> (Function <$> parseName <*> (char '(' *> parseParams <* char ')' <* char '=') <*> parseExpr))
-           <|> try (ShowFunction <$> parseFunctionName <* eof)
-           <|> (do
+           <|> try (do
                f@(Function fname params expr) <- parseFunctionName
                EvalFunction f <$> (char '(' *> parseArgs params <* char ')'))
-
+           <|> try (ShowFunction <$> parseFunctionName <* eof)
+           <|> try (NewFunction <$> (Function <$> parseName <*> (char '(' *> parseParams <* char ')' <* char '=') <*> parseExpr))
 parseConstant :: (RealFloat n, Show n, TextShow n) => Parser n n
 parseConstant = do
     e <- parseExpr 
     if isConstant e then pure (evalConstant e)
     else fail "Function argument has to be a constant expression"
 
-parseFunctionName :: Parser n (Function n)
+parseFunctionName :: (RealFloat n, TextShow n, Show n) => Parser n (Function n)
 parseFunctionName = do
     name <- T.pack <$> many1 letter
+    d <- length <$> many (char '\'')
     (fs, _) <- lift get
-    maybe (fail "No such function has been defined") pure (listToMaybe [ f | f@(Function fname _ _) <- fs, fname == name ])
+    case listToMaybe [ f | f@(Function fname params ex) <- fs, fname == name ] of
+        Nothing -> fail "No such function has been defined"
+        Just f@(Function fname [] ex) -> pure f
+        Just f@(Function fname (p:ps) ex) -> case applyNtimesM d (`differentiate` p) ex of
+            Left err -> failT err
+            Right ex -> pure $ Function fname (p:ps) ex
+        
+
+
+    --maybe (fail "No such function has been defined") pure (listToMaybe [ Function fname params (differentiate ex "x") | f@(Function fname params ex) <- fs, fname == name ])
 
 parseName :: Parser n Text
 parseName = T.pack <$> many letter
