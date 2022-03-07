@@ -2,9 +2,11 @@
 --A Step-by-Step Solution Methodology for Mathematical Expressions 
 
 {-# LANGUAGE OverloadedStrings #-}
--- {-# OPTIONS_GHC -Wno-overlapping-patterns #-}
+{-# OPTIONS_GHC -Wno-overlapping-patterns #-}
 
-module Expr (Expr(..), Argument, Parameter, Function(Function), UnaryFunction(..), BinaryFunction(..), PrefixFunction(..), InfixFunction(..), bFunctions, bFuncFromName, isConstant, evalConstant, evalFunction, betaReduce) where
+module Expr (Expr(..), Argument, Parameter, Function(Function), UnaryFunction(..), BinaryFunction(..), 
+    PrefixFunction(..), InfixFunction(..), bFunctions, uFunctions, bFuncFromName, uFuncFromName, isConstant, evalConstant,
+     evalFunction, betaReduce, uFuncNames, bFuncNames) where
 
 import Data.Number.RealCyclotomic (RealCyclotomic, toReal, toRat)
 import Data.Text (Text, unpack, pack, toLower)
@@ -67,6 +69,12 @@ infixPrecedence Mult = 6
 infixPrecedence Div  = 6
 infixPrecedence Expo = 7
 
+uFuncNames :: [Text]
+uFuncNames = [name | (_, name, _) <- uFunctions]
+
+bFuncNames :: [Text]
+bFuncNames = [name | (_, name, _) <- bFunctions]
+
 uFuncFromName :: Text -> Maybe (UnaryFunction, Text, RealCyclotomic -> RealCyclotomic)
 uFuncFromName t = listToMaybe [ f | f@(con, name, func) <- uFunctions, name == toLower t ]
 
@@ -83,18 +91,19 @@ bFuncFromConst c = head [ f | f@(con, name, func) <- bFunctions, con == c ]
 data Function = Function Text [Parameter] Expr
 
 instance Show Function where
-    show (Function name params expr) = unpack name <> "(" <> intercalate "," (map unpack params) <> ")=" <> toString (showb expr)
+    show (Function name params expr) = unpack name <> "(" <> intercalate "," (map unpack params) <> ") = " <> toString (showb expr)
 
 instance TextShow Expr where
     showbPrec p (Num  a)    = showb a
     showbPrec p (Var v)     = fromText v
-    showbPrec p (UFunc c a) = let (_, name, _) = uFuncFromConstr c in showb name <> "(" <> showb a <> ")"
+    showbPrec p (UFunc USub a) = showbParen (5 < p) ("-" <> showbPrec 5 a)
+    showbPrec p (UFunc c a) = let (_, name, _) = uFuncFromConstr c in fromText name <> "(" <> showb a <> ")"
     showbPrec p (BFunc (Prefix Log) a b) | a == Num e = "ln(" <> showb b <> ")"
                                          | otherwise = "log[" <> showb a <> "](" <> showb b <> ")"
-    showbPrec p (BFunc (Prefix c) a b) = let (_, name, _) = bFuncFromConst (Prefix c) in showb name <> "(" <> showb a <> ", " <> showb b <> ")"
+    showbPrec p (BFunc (Prefix c) a b) = let (_, name, _) = bFuncFromConst (Prefix c) in fromText name <> "(" <> showb a <> ", " <> showb b <> ")"
     showbPrec p (BFunc (Infix c) a b) = let (_, op, _) = bFuncFromConst (Infix c) 
                                             opPrec = infixPrecedence c
-                                        in  showbParen (opPrec < p) (showbPrec opPrec a <> showb op <> showbPrec opPrec b)
+                                        in  showbParen (opPrec < p) (showbPrec opPrec a <> fromText op <> showbPrec opPrec b)
 
 
 instance TextShow RealCyclotomic where

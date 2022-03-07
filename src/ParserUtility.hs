@@ -12,6 +12,7 @@ import Control.Monad.State.Lazy
 import Data.Void (Void)
 import Data.Text (Text)
 import Data.Text.Read (double)
+import Data.List (foldl')
 import qualified Data.Text as T
 import Data.Number.RealCyclotomic
 
@@ -53,5 +54,10 @@ letter = oneOf (['a'..'z'] ++ ['A'..'Z'] ++ ['α', 'β', 'γ', 'δ', 'ε', 'ζ',
 many1 :: Parser a -> Parser [a]
 many1 a = (:) <$> a <*> many a
 
+first :: [Parser a] -> Parser a
+first = foldl' (<|>) (fail "No rule applied")
+
+
 failT :: MonadFail m => Text -> m a
 failT = fail . T.unpack
+

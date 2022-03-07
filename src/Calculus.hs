@@ -74,6 +74,8 @@ diff (BFunc (Prefix Log) f g) x | f == Num e = BFunc (Infix Div) <$> diff g x <*
                                         (BFunc (Infix Div) <$> (BFunc (Infix Mult) (BFunc (Prefix Log) (Num e) g) <$> diff f x) <*> Right f)) <*> 
                                     Right (BFunc (Infix Expo) (BFunc (Prefix Log) (Num e) f) (Num 2))
 
+--diff (BFunc (Prefix Max) a b) = Left ""
+
 
 diff _ _ = undefined 
 

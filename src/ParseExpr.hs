@@ -31,7 +31,7 @@ Param        => Letter | Letter Var
 Expr         => Term Expr' | - Expr
 Expr'        => + Term Expr' | - Term Expr' | ε
 Term         => Factor Term'
-Term'        => * Factor Term' | / Factor Term' | ε
+Term'        => * Factor Term' | / Factor Term' | Factor Term' | ε
 Factor       => Num ^ Factor | Num
 Num          => (Expr) | Var | e | pi | RealCyclotomic | FunctionCall
 FunctionCall => Log[Expr](Expr) | Log RealCyclotomic (Expr) | Log (Expr) | ln(Num) | ...... etc, legg til flere her senere
@@ -61,6 +61,7 @@ parseFactor :: Parser Expr
 parseFactor = parseNum >>= \n -> BFunc (Infix Expo) n <$> (char '^' *> parseFactor) <|> pure n
 
 -- Lager en liste på formen [ *faktor, /faktor, *faktor ], som kan settes sammen venstreassosiativt med en initiell faktor
+-- Dette tillater også å droppe gangetegnet i uttrykk, f. eks. 2(3+4) = 2*(3+4).
 parseFactorList :: Parser [Expr -> Expr]
 parseFactorList = fmap ((:) . flip (BFunc (Infix Mult))) ((char '*' *> parseFactor) <|> parseFactor) <*> parseFactorList
               <|> fmap ((:) . flip (BFunc (Infix Div )))  (char '/' *> parseFactor) <*> parseFactorList
@@ -81,12 +82,20 @@ parseNum = try (Num <$> parseCyclotomic)
        <|> try (char '(' *> parseExpr <* char ')')
        <|> try parseVar
        <|> char 'e' $> Num e
-       <|> (string "pi" <|> string "Pi" <|> string "π") $> Num pi
+       <|> try (string "pi" <|> string "Pi" <|> string "π") $> Num pi
        <|> parseFunctionCall
 
 parseFunctionCall :: Parser Expr
 parseFunctionCall = try (BFunc (Prefix Log) (Num e) <$> ((string "log" <|> string "Log" <|> string "ln" <|> string "Ln") *> char '(' *> parseExpr <* char ')')) --log med e som base
        <|> try (BFunc (Prefix Log) <$> ((string "log" <|> string "Log") *> (char '[' *> parseExpr <* char ']' <|> fmap Num parseCyclotomic)) <*> (char '(' *> parseExpr <* char ')')) -- log med custom base
+       <|> try (do
+            name <- first [ try (string fname) | (_, fname, _) <- uFunctions, fname /= "-"]
+            let Just (c, _, _) = uFuncFromName name
+            UFunc c <$> (char '(' *> parseExpr <* char ')') )
+       <|> try (do
+            name <- first [ try (string fname) | (_, fname, _) <- bFunctions]
+            let Just (c, _, _) = bFuncFromName name
+            BFunc c <$> (char '(' *> parseExpr <* char ',') <*> parseExpr <* char ')' )
        <|> (do
             name <- T.pack <$> many1 letter
             (fs, _) <- lift get
