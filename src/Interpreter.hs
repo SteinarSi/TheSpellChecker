@@ -24,3 +24,4 @@ loop fs = do
             Quit -> putStrLn "Bye-bye!"
             NewFunction f -> putStrLn ("I parsed the function like this: " ++ show f) >> loop (f:fs)
             EvalFunction f args -> either (putStrLn . T.unpack) (\n -> putStrLn (inn ++ " = " ++ show n)) (evalFunction f args) >> loop fs
+            ShowFunction f -> print f >> loop fs

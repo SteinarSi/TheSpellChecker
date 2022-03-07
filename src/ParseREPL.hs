@@ -17,11 +17,13 @@ import Data.Maybe (listToMaybe, maybe)
 import Expr
 import ParserUtility
 import ParseExpr
+import ParserUtility (tryWhatever)
 
 
 
 data Command n = NewFunction (Function n)
                | EvalFunction (Function n) [Argument n]
+               | ShowFunction (Function n)
                | Quit
                | Help
 
@@ -29,15 +31,10 @@ parseCommand :: (RealFloat n, Show n, TextShow n) => Parser n (Command n)
 parseCommand = try (Help <$ (string "help" <|> string "Help"))
            <|> try (Quit <$ (string "quit" <|> string "q" <|> string "Quit"))
            <|> try (NewFunction <$> (Function <$> parseName <*> (char '(' *> parseParams <* char ')' <* char '=') <*> parseExpr))
+           <|> try (ShowFunction <$> parseFunctionName <* eof)
            <|> (do
-               name <- parseName
-               (fs, _) <- lift get
-               f@(Function fname params expr) <- maybe (fail "No such function has been defined") pure (listToMaybe [ f | f@(Function fname _ _) <- fs, fname == name ])
-               char '('
-               a <- many (tryWhatever (char ',') parseConstant)
-               char ')'
-               eof
-               pure (EvalFunction f (zip params a)))
+               f@(Function fname params expr) <- parseFunctionName
+               EvalFunction f <$> (char '(' *> parseArgs params <* char ')'))
 
 parseConstant :: (RealFloat n, Show n, TextShow n) => Parser n n
 parseConstant = do
@@ -45,8 +42,18 @@ parseConstant = do
     if isConstant e then pure (evalConstant e)
     else fail "Function argument has to be a constant expression"
 
+parseFunctionName :: Parser n (Function n)
+parseFunctionName = do
+    name <- T.pack <$> many1 letter
+    (fs, _) <- lift get
+    maybe (fail "No such function has been defined") pure (listToMaybe [ f | f@(Function fname _ _) <- fs, fname == name ])
+
 parseName :: Parser n Text
-parseName = T.pack <$> many1 letter
+parseName = T.pack <$> many letter
+
+parseArgs :: (RealFloat n, Show n, TextShow n) => [Parameter] -> Parser n [Argument n]
+parseArgs [] = pure []
+parseArgs (p:ps) = (:) . (,) p <$> parseConstant <*> tryWhatever (char ',') (parseArgs ps)
 
 parseParams :: (RealFloat n, Show n, TextShow n) => Parser n [Parameter]
 parseParams = (do
@@ -56,3 +63,4 @@ parseParams = (do
         else lift (modify (fmap (p:))) *> fmap (p :) parseParams
   ) <|> char ',' *> parseParams
     <|> pure []
+
