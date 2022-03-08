@@ -5,7 +5,7 @@
 {-# OPTIONS_GHC -Wno-overlapping-patterns #-}
 
 module Expr (Expr(..), Argument, Parameter, Function(Function), UnaryFunction(..), BinaryFunction(..), 
-    PrefixFunction(..), InfixFunction(..), bFunctions, uFunctions, bFuncFromName, uFuncFromName, isConstant, evalConstant,
+    PrefixFunction(..), InfixFunction(..), bFunctions, uFunctions, bFuncFromName, uFuncFromName, bFuncFromConstr, uFuncFromConstr, isConstant, evalConstant,
      evalFunction, betaReduce, uFuncNames, bFuncNames) where
 
 import Data.Number.RealCyclotomic (RealCyclotomic, toReal, toRat)
@@ -30,14 +30,14 @@ data Function n = Function Text [Parameter] (Expr n)
 type Argument n = (Text, n)
 type Parameter = Text
 
-data UnaryFunction = Sin | Cos | Tan | USub -- | Ceiling | Floor
+data UnaryFunction = Sin | Cos | Tan | USub | Ceiling | Floor
     deriving (Eq, Show)
 
 data BinaryFunction = Prefix PrefixFunction
                     | Infix  InfixFunction
     deriving (Eq, Show)
 
-data PrefixFunction = Log -- | Max | Min
+data PrefixFunction = Log | Max | Min
     deriving (Eq, Show)
 
 data InfixFunction  = Add | BSub | Mult | Div | Expo
@@ -48,7 +48,9 @@ uFunctions = [
         (Sin, "sin", sin),
         (Cos, "cos", cos),
         (Tan, "tan", tan),
-        (USub, "-", negate)
+        (USub, "-", negate),
+        (Ceiling, "ceiling", fromIntegral . ceiling),
+        (Floor, "floor", fromIntegral . floor)
     ]
 
 bFunctions :: RealFloat n => [(BinaryFunction, Text, n -> n -> n)]
@@ -58,15 +60,15 @@ bFunctions = [
         (Infix Mult, "*", (*)),
         (Infix Div, "/", (/)),
         (Prefix Log, "log", logBase),
-        (Infix Expo, "^", (**)) --,
-        -- (Prefix Max, "max", \x y -> realToRat $ max (toReal x) (toReal y)),
-        -- (Prefix Min, "min", \x y -> realToRat $ min (toReal x) (toReal y))
+        (Infix Expo, "^", (**)),
+        (Prefix Max, "max", max),
+        (Prefix Min, "min", min)
     ]
 
 infixPrecedence :: InfixFunction -> Int
-infixPrecedence Add  = 5
-infixPrecedence BSub = 5
-infixPrecedence Mult = 6
+infixPrecedence Add  = 3
+infixPrecedence BSub = 4
+infixPrecedence Mult = 5
 infixPrecedence Div  = 6
 infixPrecedence Expo = 7
 
@@ -85,8 +87,8 @@ bFuncFromName t = listToMaybe [ f | f@(con, name, func) <- bFunctions, name == t
 uFuncFromConstr :: RealFloat n => UnaryFunction -> (UnaryFunction, Text, n -> n)
 uFuncFromConstr c = head [ f | f@(con, name, func) <- uFunctions, con == c ]
 
-bFuncFromConst :: RealFloat n => BinaryFunction -> (BinaryFunction, Text, n -> n -> n)
-bFuncFromConst c = head [ f | f@(con, name, func) <- bFunctions, con == c ]
+bFuncFromConstr :: RealFloat n => BinaryFunction -> (BinaryFunction, Text, n -> n -> n)
+bFuncFromConstr c = head [ f | f@(con, name, func) <- bFunctions, con == c ]
 
 
 instance (RealFloat n, TextShow n) => Show (Function n) where
@@ -99,8 +101,8 @@ instance (RealFloat n, TextShow n) => TextShow (Expr n) where
     showbPrec p (UFunc c a) = let (_, name, _) = uFuncFromConstr c in fromText name <> "(" <> showb a <> ")"
     showbPrec p (BFunc (Prefix Log) a b) | a == Num e = "ln(" <> showb b <> ")"
                                          | otherwise = "log[" <> showb a <> "](" <> showb b <> ")"
-    showbPrec p (BFunc (Prefix c) a b) = let (_, name, _) = bFuncFromConst (Prefix c) in fromText name <> "(" <> showb a <> ", " <> showb b <> ")"
-    showbPrec p (BFunc (Infix c) a b) = let (_, op, _) = bFuncFromConst (Infix c) 
+    showbPrec p (BFunc (Prefix c) a b) = let (_, name, _) = bFuncFromConstr (Prefix c) in fromText name <> "(" <> showb a <> ", " <> showb b <> ")"
+    showbPrec p (BFunc (Infix c) a b) = let (_, op, _) = bFuncFromConstr (Infix c) 
                                             opPrec = infixPrecedence c
                                         in  showbParen (opPrec < p) (showbPrec opPrec a <> fromText op <> showbPrec opPrec b)
 
@@ -126,7 +128,7 @@ evalConstant :: RealFloat n => Expr n -> n
 evalConstant (Var _) = error "Unexpected variable in 'constant'"
 evalConstant (Num a) = a
 evalConstant (UFunc c a) = let (_, _, f) = uFuncFromConstr c in f (evalConstant a)
-evalConstant (BFunc c a b) = let (_, _, f) = bFuncFromConst c in f (evalConstant a) (evalConstant b)
+evalConstant (BFunc c a b) = let (_, _, f) = bFuncFromConstr c in f (evalConstant a) (evalConstant b)
 
 evalFunction :: RealFloat n => Function n -> [Argument n] -> Either Text n
 evalFunction (Function _ params ex) args | params == map fst args = Right $ evalFunction' ex args
@@ -136,5 +138,5 @@ evalFunction (Function _ params ex) args | params == map fst args = Right $ eval
         evalFunction' (Var v) params = head [ value | (name, value) <- params, v == name ]
         evalFunction' (Num a) _ = a
         evalFunction' (UFunc c a) params = let (_, _, f) = uFuncFromConstr c in f (evalFunction' a params)
-        evalFunction' (BFunc c a b) params = let (_, _, f) = bFuncFromConst c in f (evalFunction' a params) (evalFunction' b params)
+        evalFunction' (BFunc c a b) params = let (_, _, f) = bFuncFromConstr c in f (evalFunction' a params) (evalFunction' b params)
 

@@ -1,5 +1,5 @@
 
-
+{-# LANGUAGE OverloadedStrings #-}
 
 
 module Calculus where
@@ -75,10 +75,10 @@ diff (BFunc (Prefix Log) f g) x | f == Num e = BFunc (Infix Div) <$> diff g x <*
                                         (BFunc (Infix Div) <$> (BFunc (Infix Mult) (BFunc (Prefix Log) (Num e) g) <$> diff f x) <*> Right f)) <*> 
                                     Right (BFunc (Infix Expo) (BFunc (Prefix Log) (Num e) f) (Num 2))
 
---diff (BFunc (Prefix Max) a b) = Left ""
+diff (BFunc (Prefix c) _ _) _ = let (_, name, _) = bFuncFromConstr (Prefix c) in Left ("The function " <> name <> "() has no defined derivative (yet)")
+diff (BFunc (Infix c)  _ _) _ = let (_, name, _) = bFuncFromConstr (Infix  c) in Left ("The operator " <> name <> " has no defined derivative (yet)")
+diff (UFunc c _) _ = let (_, name, _) = uFuncFromConstr c in Left ("The function " <> name <> " has no defined derivative (yet)")
 
-
-diff _ _ = undefined 
 
 {-
 -- TODO: teste denne sjiten
