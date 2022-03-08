@@ -17,20 +17,18 @@ import Data.Maybe (listToMaybe)
 import Utility (realToRat, e)
 
 
--- 2 + 3 * 4^5 = Add (Num 2) (Mult (Num 3) (Expo (Num 4) (Num 5)))
-
 data Expr n = UFunc UnaryFunction (Expr n)
             | BFunc BinaryFunction (Expr n) (Expr n)
             | Num n
             | Var Text
-    deriving (Show, Eq)
+    deriving Eq
 
 data Function n = Function Text [Parameter] (Expr n)
 
 type Argument n = (Text, n)
 type Parameter = Text
 
-data UnaryFunction = Sin | Cos | Tan | USub | Ceiling | Floor
+data UnaryFunction = Sin | Cos | Tan | USub | Ceiling | Floor | Sqrt
     deriving (Eq, Show)
 
 data BinaryFunction = Prefix PrefixFunction
@@ -50,7 +48,8 @@ uFunctions = [
         (Tan, "tan", tan),
         (USub, "-", negate),
         (Ceiling, "ceiling", fromIntegral . ceiling),
-        (Floor, "floor", fromIntegral . floor)
+        (Floor, "floor", fromIntegral . floor),
+        (Sqrt, "sqrt", sqrt)
     ]
 
 bFunctions :: RealFloat n => [(BinaryFunction, Text, n -> n -> n)]
@@ -94,6 +93,10 @@ bFuncFromConstr c = head [ f | f@(con, name, func) <- bFunctions, con == c ]
 instance (RealFloat n, TextShow n) => Show (Function n) where
     show (Function name params expr) = unpack name <> "(" <> intercalate "," (map unpack params) <> ") = " <> toString (showb expr)
 
+instance Eq (Function n) where
+    (Function name1 _ _) == (Function name2 _ _) = name1 == name2
+
+
 instance (RealFloat n, TextShow n) => TextShow (Expr n) where
     showbPrec p (Num  a)    = showb a
     showbPrec p (Var v)     = fromText v
@@ -109,6 +112,10 @@ instance (RealFloat n, TextShow n) => TextShow (Expr n) where
 
 instance TextShow RealCyclotomic where
     showb = fromText . pack . show
+
+instance (TextShow n, RealFloat n, Show n) => Show (Expr n) where
+    show = toString . showb
+
 
 -- erstatter alle variabler med sin nye verdi.
 betaReduce :: Expr n -> [(Text, Expr n)] -> Expr n

@@ -10,3 +10,5 @@ f(a1, a2, .... a3)
 Show a function:
 f
 
+After defining a funciton f, get its derivatives (if possible) by referring to f', f'', etc
+f'

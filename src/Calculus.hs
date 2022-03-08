@@ -48,6 +48,9 @@ diff (UFunc Cos a) x = BFunc (Infix Mult) (UFunc USub (UFunc Sin a)) <$> diff a 
 -- tan(f)' = f'/cos^2(f)
 diff (UFunc Tan a) x = BFunc (Infix Div) <$> diff a x <*> Right (BFunc (Infix Expo) (UFunc Cos a) (Num 2))
 
+-- (sqrt(f))' = (f^(1/2))'
+diff (UFunc Sqrt f) x = diff (BFunc (Infix Expo) f (BFunc (Infix Div) (Num 1) (Num 2))) x
+
 -- (f * g)' = f' * g + f * g'
 diff (BFunc (Infix Mult) a b) x = BFunc (Infix Add) <$> (BFunc (Infix Mult) <$> diff a x <*> Right b) <*> (BFunc (Infix Mult) a <$> diff b x)
 
