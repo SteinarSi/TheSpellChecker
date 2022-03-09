@@ -7,7 +7,7 @@ import qualified Data.Text as T
 
 import Data.Either (either)
 import Data.Number.CReal
-import TextShow (showb)
+import TextShow (showb, toString)
 import Data.List (delete)
 
 import Expr
@@ -17,6 +17,7 @@ import Calculus (simplify)
 
 
 
+-- TODO, gjør om til REPL
 loop :: [Function CReal] -> IO ()
 loop fs = do
     inn <- getLine
@@ -29,6 +30,5 @@ loop fs = do
                 putStrLn ("I parsed the function like this: " ++ show f)
                 putStrLn ("And it was simplified to this: " ++ show (simplify ex))
                 loop (Function name params (simplify ex) : delete f fs)
-            EvalFunction f args -> either (putStrLn . T.unpack) (\n -> putStrLn (inn ++ " = " ++ show n)) (evalFunction f args) >> loop fs
-            EvalConstant ex -> putStrLn (show ex <> " = " <> show (evalConstant ex)) >> loop fs
+            EvalConstant ex -> putStrLn (toString (showb ex <> " = " <> showb (evalConstant ex))) >> loop fs
             ShowFunction f -> print f >> loop fs

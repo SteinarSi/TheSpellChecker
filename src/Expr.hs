@@ -29,7 +29,7 @@ data Function n = Function Text [Parameter] (Expr n)
 type Argument n = (Text, n)
 type Parameter = Text
 
-data UnaryFunction = Sin | Cos | Tan | USub | Ceiling | Floor | Sqrt
+data UnaryFunction = Sin | Cos | Tan | USub | Ceiling | Floor | Sqrt | Succ | Pred
     deriving (Eq, Show)
 
 data BinaryFunction = Prefix PrefixFunction
@@ -50,7 +50,9 @@ uFunctions = [
         (USub, "-", negate),
         (Ceiling, "ceiling", fromIntegral . ceiling),
         (Floor, "floor", fromIntegral . floor),
-        (Sqrt, "sqrt", sqrt)
+        (Sqrt, "sqrt", sqrt),
+        (Succ, "succ", (+1)),
+        (Pred, "pred", ((-)1))
     ]
 
 bFunctions :: RealFloat n => [(BinaryFunction, Text, n -> n -> n)]
@@ -66,10 +68,10 @@ bFunctions = [
     ]
 
 infixPrecedence :: InfixFunction -> Int
-infixPrecedence Add  = 3
-infixPrecedence BSub = 4
-infixPrecedence Mult = 5
-infixPrecedence Div  = 6
+infixPrecedence BSub = 3
+infixPrecedence Add  = 4
+infixPrecedence Div  = 5
+infixPrecedence Mult = 6
 infixPrecedence Expo = 7
 
 uFuncNames :: [Text]
@@ -115,6 +117,7 @@ instance (RealFloat n, TextShow n) => TextShow (Expr n) where
 instance TextShow RealCyclotomic where
     showb = fromText . pack . show
 
+
 instance (TextShow n, RealFloat n, Show n) => Show (Expr n) where
     show = toString . showb
 
@@ -130,7 +133,7 @@ betaReduce (BFunc c a b)  args = BFunc c (betaReduce a args) (betaReduce b args)
 isConstant :: Expr n -> Bool
 isConstant (Var _) = False
 isConstant (Num _) = True
-isConstant (Const _ _)= True
+isConstant (Const _ _) = True
 isConstant (UFunc _ a) = isConstant a
 isConstant (BFunc _ a b) = isConstant a && isConstant b
 

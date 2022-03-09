@@ -40,6 +40,12 @@ diff (BFunc (Infix BSub) a b) x = BFunc (Infix BSub) <$> diff a x <*> diff b x
 -- (-f)' = -f'
 diff (UFunc USub a) x = UFunc USub <$> diff a x
 
+-- (succ(f))' = f'
+diff (UFunc Succ a) x = diff a x
+
+-- (pred(f))' = f'
+diff (UFunc Pred a) x = diff a x
+
 -- sin(f)' = cos(x) * f'
 diff (UFunc Sin a) x = BFunc (Infix Mult) (UFunc Cos a) <$> diff a x
 
