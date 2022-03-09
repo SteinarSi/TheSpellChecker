@@ -11,8 +11,9 @@ import TextShow (showb)
 import Data.List (delete)
 
 import Expr
-import ParseExpr
-import ParseREPL
+import ParseExpr ( parse )
+import ParseREPL( parseCommand,Command(..) )
+import Calculus (simplify)
 
 
 
@@ -24,7 +25,10 @@ loop fs = do
         Right ex -> case ex of
             Help -> readFile "data/help.txt" >>= putStrLn >> loop fs
             Quit -> putStrLn "Bye-bye!"
-            NewFunction f -> putStrLn ("I parsed the function like this: " ++ show f) >> loop (f : delete f fs)
+            NewFunction f@(Function name params ex) -> do
+                putStrLn ("I parsed the function like this: " ++ show f)
+                putStrLn ("And it was simplified to this: " ++ show (simplify ex))
+                loop (Function name params (simplify ex) : delete f fs)
             EvalFunction f args -> either (putStrLn . T.unpack) (\n -> putStrLn (inn ++ " = " ++ show n)) (evalFunction f args) >> loop fs
             EvalConstant ex -> putStrLn (show ex <> " = " <> show (evalConstant ex)) >> loop fs
             ShowFunction f -> print f >> loop fs

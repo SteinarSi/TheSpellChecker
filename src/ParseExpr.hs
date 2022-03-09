@@ -82,8 +82,8 @@ parseNum :: (RealFloat n, Show n, TextShow n) => Parser n (Expr n)
 parseNum = try (Num <$> parseRealFloat)
        <|> try (char '(' *> parseExpr <* char ')')
        <|> try parseVar
-       <|> char 'e' $> Num e
-       <|> try (string "pi" <|> string "Pi" <|> string "π") $> Num pi
+       <|> char 'e' $> Const "e" e
+       <|> try (string "pi" <|> string "Pi" <|> string "π") $> Const "pi" pi
        <|> parseFunctionCall
 
 parseFunctionCall :: (RealFloat n, Show n, TextShow n) => Parser n (Expr n)

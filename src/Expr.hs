@@ -21,6 +21,7 @@ data Expr n = UFunc UnaryFunction (Expr n)
             | BFunc BinaryFunction (Expr n) (Expr n)
             | Num n
             | Var Text
+            | Const Text n
     deriving Eq
 
 data Function n = Function Text [Parameter] (Expr n)
@@ -98,6 +99,7 @@ instance Eq (Function n) where
 
 
 instance (RealFloat n, TextShow n) => TextShow (Expr n) where
+    showbPrec p (Const name _) = fromText name
     showbPrec p (Num  a)    = showb a
     showbPrec p (Var v)     = fromText v
     showbPrec p (UFunc USub a) = showbParen (5 < p) ("-" <> showbPrec 5 a)
@@ -119,14 +121,16 @@ instance (TextShow n, RealFloat n, Show n) => Show (Expr n) where
 
 -- erstatter alle variabler med sin nye verdi.
 betaReduce :: Expr n -> [(Text, Expr n)] -> Expr n
-betaReduce (Var v) args = head [ value | (name, value) <- args, v == name ]
-betaReduce (Num n) args = Num n
-betaReduce (UFunc c a) args = UFunc c (betaReduce a args)
-betaReduce (BFunc c a b) args = BFunc c (betaReduce a args) (betaReduce b args)
+betaReduce (Const name n) _    = Const name n
+betaReduce (Num n)        _    = Num n
+betaReduce (Var v)        args = head [ value | (name, value) <- args, v == name ]
+betaReduce (UFunc c a)    args = UFunc c (betaReduce a args)
+betaReduce (BFunc c a b)  args = BFunc c (betaReduce a args) (betaReduce b args)
 
 isConstant :: Expr n -> Bool
 isConstant (Var _) = False
 isConstant (Num _) = True
+isConstant (Const _ _)= True
 isConstant (UFunc _ a) = isConstant a
 isConstant (BFunc _ a b) = isConstant a && isConstant b
 
@@ -134,6 +138,7 @@ isConstant (BFunc _ a b) = isConstant a && isConstant b
 evalConstant :: RealFloat n => Expr n -> n
 evalConstant (Var _) = error "Unexpected variable in 'constant'"
 evalConstant (Num a) = a
+evalConstant (Const _ n) = n
 evalConstant (UFunc c a) = let (_, _, f) = uFuncFromConstr c in f (evalConstant a)
 evalConstant (BFunc c a b) = let (_, _, f) = bFuncFromConstr c in f (evalConstant a) (evalConstant b)
 
@@ -142,8 +147,11 @@ evalFunction (Function _ params ex) args | params == map fst args = Right $ eval
                                          | otherwise = Left ("Function arguments did not match function parameters: " <> toText (showb (map fst args)) <> " vs " <> toText (showb params))
     where
         evalFunction' :: RealFloat n => Expr n -> [Argument n] -> n
-        evalFunction' (Var v) params = head [ value | (name, value) <- params, v == name ]
-        evalFunction' (Num a) _ = a
-        evalFunction' (UFunc c a) params = let (_, _, f) = uFuncFromConstr c in f (evalFunction' a params)
-        evalFunction' (BFunc c a b) params = let (_, _, f) = bFuncFromConstr c in f (evalFunction' a params) (evalFunction' b params)
+        evalFunction' (Num a)        _ = a
+        evalFunction' (Const name n) _ = n
+        evalFunction' (Var v)        params = head [ value | (name, value) <- params, v == name ]
+        evalFunction' (UFunc c a)    params = let (_, _, f) = uFuncFromConstr c in f (evalFunction' a params)
+        evalFunction' (BFunc c a b)  params = let (_, _, f) = bFuncFromConstr c in f (evalFunction' a params) (evalFunction' b params)
+
+
 
