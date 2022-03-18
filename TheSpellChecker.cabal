@@ -28,6 +28,7 @@ library
       Calculus
       Expr
       Interpreter
+      Matrix
       ParseExpr
       ParseREPL
       ParserUtility
@@ -40,12 +41,16 @@ library
       HUnit
     , base >=4.7 && <5
     , cyclotomic
+    , finite-typelits
+    , ghc-typelits-knownnat
     , megaparsec
     , mtl
     , numbers
+    , split
     , text
     , text-show
     , transformers
+    , vector-sized
   default-language: Haskell2010
 
 executable TheSpellChecker-exe
@@ -60,12 +65,16 @@ executable TheSpellChecker-exe
     , TheSpellChecker
     , base >=4.7 && <5
     , cyclotomic
+    , finite-typelits
+    , ghc-typelits-knownnat
     , megaparsec
     , mtl
     , numbers
+    , split
     , text
     , text-show
     , transformers
+    , vector-sized
   default-language: Haskell2010
 
 test-suite TheSpellChecker-test
@@ -83,10 +92,14 @@ test-suite TheSpellChecker-test
     , TheSpellChecker
     , base >=4.7 && <5
     , cyclotomic
+    , finite-typelits
+    , ghc-typelits-knownnat
     , megaparsec
     , mtl
     , numbers
+    , split
     , text
     , text-show
     , transformers
+    , vector-sized
   default-language: Haskell2010

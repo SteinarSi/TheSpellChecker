@@ -29,6 +29,10 @@ dependencies:
 - text-show
 - HUnit
 - numbers
+- vector-sized
+- ghc-typelits-knownnat
+- split
+- finite-typelits
 
 library:
   source-dirs: src

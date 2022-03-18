@@ -34,8 +34,8 @@ parseRealFloat = do
     comma  <- withDefault (string ".") ""
     after  <- withDefault (T.pack <$> many digit) "0"
     case double (before <> comma <> after) of
-        Left err      -> fail err
-        Right  (n, _) -> pure (realToRat n)
+        Left err     -> fail err
+        Right (n, _) -> pure (realToRat n)
 
 digit :: Parser n Char
 digit = oneOf ['0'..'9']
