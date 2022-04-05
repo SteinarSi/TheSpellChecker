@@ -108,7 +108,3 @@ parseFunctionCall = try (BFunc (Prefix Log) (Num e) <$> ((string "log" <|> strin
                     char ')'
                     pure (betaReduce ex (zip params args))
        )
-
-
-
-
