@@ -18,6 +18,10 @@ e = 2.71828182845904523536028747
 applyNtimesM :: Monad m => Int -> (a -> m a) -> a -> m a 
 applyNtimesM n f a = iterate (>>= f) (pure a) !! n
 
+deleteNth :: Integer -> [a] -> [a]
+deleteNth _ [] = []
+deleteNth 0 (_:xs) = xs
+deleteNth n (x:xs) = x : deleteNth (n-1) xs
 
 instance TextShow CReal where
     showb = fromString . showCReal 3

@@ -9,15 +9,16 @@ import GHC.TypeLits (natVal, KnownNat, Nat, Symbol, type (+), type (*), type (-)
 import Data.Proxy (Proxy(..))
 import qualified Data.Vector.Sized as V
 import Data.List.Split (chunksOf)
-import Data.Finite (Finite, finite)
+import Data.Finite (Finite, finite, getFinite)
 import Control.Applicative (liftA2)
 import Prelude hiding (compose, replicate)
 import Data.Type.Bool (If)
 import Data.Type.Coercion (trans)
 import Data.Bool (bool)
 import Data.List (findIndices, find)
-import Data.Maybe (listToMaybe)
+import Data.Maybe (listToMaybe, fromJust)
 import Control.Monad (join, (<=<))
+import Utility (deleteNth)
 
 
 type Vector m a = Matrix m 1 a
@@ -60,6 +61,9 @@ index (Matrix v) (i, j) = V.index (V.index v j) i
 scale :: forall m n a. (KnownNat m, KnownNat n, Num a) => a -> Matrix m n a -> Matrix m n a
 scale a = fmap (a*)
 
+pivots :: forall m n a. (KnownNat m, KnownNat n, Num a) => Matrix m n a -> [(Finite m, Finite n)]
+pivots a = undefined 
+
 fromList :: forall m n a. (KnownNat m, KnownNat n) => [[a]] -> Maybe (Matrix m n a)
 fromList = fmap (transpose . Matrix) . V.fromList <=< mapM V.fromList
 
@@ -98,8 +102,11 @@ row m (Matrix v) = Matrix (V.singleton (V.map (`V.index` m) v))
 rows :: forall m n a. (KnownNat m, KnownNat n) => Matrix m n a -> Matrix n m a
 rows = Matrix . sequenceA . unMatrix
 
+diag :: forall m n a. (KnownNat m, KnownNat n) => Matrix m n a -> [a]
+diag a = map (\i -> a ! (finite i, finite i)) [0..min (natVal @m Proxy) (natVal @n Proxy) -1]
+
 unit :: forall m n b i. (KnownNat n, Num b) => Finite n -> Vector n b
-unit a = Matrix (V.singleton (V.generate (\i -> if i == a then 1 else 0)))
+unit a = vector (V.generate (\i -> if i == a then 1 else 0))
 
 identity :: forall n a. (KnownNat n, Num a) => Matrix n n a
 identity = Matrix (V.generate (expose . unit))
@@ -109,6 +116,9 @@ zipMatrixWith f (Matrix u) (Matrix v) = Matrix (V.zipWith (V.zipWith f) u v)
 
 dot :: forall n a. (KnownNat n, Num a) => Vector n a -> Vector n a -> a
 dot = (sum .) . (*)
+
+aij :: forall m n a. (KnownNat m, KnownNat n) => (Finite (m+1), Finite (n+1)) -> Matrix (m+1) (n+1) a -> Matrix m n a
+aij (i, j) (Matrix v) = Matrix (fromJust (V.fromList (deleteNth (getFinite j) (map (fromJust . V.fromList . deleteNth (getFinite i) . V.toList) (V.toList v)))))
 
 (•) :: forall n a. (KnownNat n, Num a) => Vector n a -> Vector n a -> a
 (•) = dot
