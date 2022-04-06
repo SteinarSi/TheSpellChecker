@@ -1,5 +1,6 @@
 
-{-# LANGUAGE NoStarIsType, DataKinds, TypeApplications, ScopedTypeVariables, TypeOperators, RankNTypes, DeriveTraversable, TypeFamilies #-}
+{-# LANGUAGE NoStarIsType, DataKinds, TypeApplications, ScopedTypeVariables, TypeOperators, 
+    RankNTypes, DeriveTraversable, TypeFamilies #-}
 
 
 module Matrix where
@@ -12,6 +13,11 @@ import Data.Finite (Finite, finite)
 import Control.Applicative (liftA2)
 import Prelude hiding (compose, replicate)
 import Data.Type.Bool (If)
+import Data.Type.Coercion (trans)
+import Data.Bool (bool)
+import Data.List (findIndices, find)
+import Data.Maybe (listToMaybe)
+import Control.Monad (join, (<=<))
 
 
 type Vector m a = Matrix m 1 a
@@ -54,11 +60,15 @@ index (Matrix v) (i, j) = V.index (V.index v j) i
 scale :: forall m n a. (KnownNat m, KnownNat n, Num a) => a -> Matrix m n a -> Matrix m n a
 scale a = fmap (a*)
 
+fromList :: forall m n a. (KnownNat m, KnownNat n) => [[a]] -> Maybe (Matrix m n a)
+fromList = fmap (transpose . Matrix) . V.fromList <=< mapM V.fromList
 
+swap :: forall m n a. (KnownNat m, KnownNat n) => Finite m -> Finite m -> Matrix m n a -> Matrix m n a
+swap r1 r2 a = transpose (Matrix (V.imap (\i r -> if i == r1 then expose (row r2 a) else if i == r2 then expose (row r1 a) else r) (unMatrix (rows a))))
 
---TODOOOOOO
-addRow :: forall m n a. (KnownNat m, KnownNat n, Fractional a) => Integer -> Matrix m n a -> Matrix m n a
-addRow i m = transpose (Matrix (V.imap (\i' r -> if finite i /= i' then fmap (negate . (/ m ! (i', finite i))) r + expose (row (finite i) m) else r) (unMatrix (transpose m))))
+addRow :: forall m n a. (KnownNat m, KnownNat n, Fractional a) => Finite m -> Finite n -> Matrix m n a -> Matrix m n a
+addRow i j a = transpose (Matrix (V.imap (\i' r -> bool (r + V.map (*(- a ! (i', j))) roww) r (i == i')) (unMatrix (rows a))))
+    where roww = expose $ row i a
 
 
 scaleRow :: forall m n a. (KnownNat m, KnownNat n, Num a) => Finite m -> a -> Matrix m n a -> Matrix m n a
@@ -73,7 +83,7 @@ vector = Matrix . V.singleton
 expose :: forall m n a. Vector n a -> V.Vector n a
 expose (Matrix v) = V.head v
 
-compose :: forall m n h a. Matrix m n a -> Matrix m h a -> Matrix m (n+h) a
+compose :: Matrix m n a -> Matrix m h a -> Matrix m (n+h) a
 compose (Matrix u) (Matrix v) = Matrix (u V.++ v)
 
 col :: forall m n a. (KnownNat n) => Finite n -> Matrix m n a -> Vector m a
@@ -103,6 +113,8 @@ dot = (sum .) . (*)
 (•) :: forall n a. (KnownNat n, Num a) => Vector n a -> Vector n a -> a
 (•) = dot
 
+findindex :: forall n a. KnownNat n => Finite n -> (a -> Bool) -> Vector n a -> Maybe (Finite n)
+findindex u f a = find (>= u) (map (finite . fromIntegral) (findIndices f (V.toList (expose a))))
 
 {-}
 type family If (a :: Bool) (b :: Nat) (c :: Nat) :: Nat where
