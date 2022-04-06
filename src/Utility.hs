@@ -4,14 +4,13 @@ module Utility where
 
 
 import Data.Number.RealCyclotomic (RealCyclotomic, toReal, sqrtRat)
-import Data.Text (Text, unpack)
+import Data.Text (Text, unpack, pack)
 import TextShow --(TextShow, showb)
 import Data.Number.CReal
 
 
 realToRat :: (Real a, Fractional b) => a -> b
 realToRat = fromRational . realToFrac
-
 
 e :: (RealFloat n, TextShow n) => n
 e = 2.71828182845904523536028747
@@ -22,6 +21,9 @@ applyNtimesM n f a = iterate (>>= f) (pure a) !! n
 
 instance TextShow CReal where
     showb = fromString . showCReal 3
+
+instance TextShow RealCyclotomic where
+    showb = fromText . pack . show
 
 instance Floating RealCyclotomic where
     pi = 3.141592653589793238462643383

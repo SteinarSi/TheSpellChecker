@@ -115,13 +115,3 @@ dot = (sum .) . (*)
 
 findindex :: forall n a. KnownNat n => Finite n -> (a -> Bool) -> Vector n a -> Maybe (Finite n)
 findindex u f a = find (>= u) (map (finite . fromIntegral) (findIndices f (V.toList (expose a))))
-
-{-}
-type family If (a :: Bool) (b :: Nat) (c :: Nat) :: Nat where
-    If 'True b c = b
-    If 'False b c = c
-
-type family Min (a :: Nat) (b :: Nat) :: Nat where
-    Min a a = a
-    Min 0 b = 0
-    Min a b = If (a <=? b) a b-}

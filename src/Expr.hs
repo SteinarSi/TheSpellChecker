@@ -29,7 +29,7 @@ data Function n = Function Text [Parameter] (Expr n)
 type Argument n = (Text, n)
 type Parameter = Text
 
-data UnaryFunction = Sin | Cos | Tan | USub | Ceiling | Floor | Sqrt | Succ | Pred
+data UnaryFunction = Sin | Cos | Tan | USub | Ceiling | Floor | Sqrt | Succ | Pred | Abs
     deriving (Eq, Show)
 
 data BinaryFunction = Prefix PrefixFunction
@@ -52,7 +52,8 @@ uFunctions = [
         (Floor, "floor", fromIntegral . floor),
         (Sqrt, "sqrt", sqrt),
         (Succ, "succ", (+1)),
-        (Pred, "pred", ((-)1))
+        (Pred, "pred", (-) 1),
+        (Abs, "abs", abs)
     ]
 
 bFunctions :: RealFloat n => [(BinaryFunction, Text, n -> n -> n)]
@@ -113,14 +114,21 @@ instance (RealFloat n, TextShow n) => TextShow (Expr n) where
                                             opPrec = infixPrecedence c
                                         in  showbParen (opPrec < p) (showbPrec opPrec a <> fromText op <> showbPrec opPrec b)
 
-
-instance TextShow RealCyclotomic where
-    showb = fromText . pack . show
-
-
 instance (TextShow n, RealFloat n, Show n) => Show (Expr n) where
     show = toString . showb
 
+instance Num n => Num (Expr n) where
+    (+) = BFunc (Infix Add)
+    (-) = BFunc (Infix BSub)
+    (*) = BFunc (Infix Mult)
+    signum = undefined 
+    abs = UFunc Abs
+    fromInteger = Num . fromInteger
+
+instance Fractional n => Fractional (Expr n) where
+    (/) = BFunc (Infix Div)
+    fromRational = Num . fromRational
+    
 
 -- erstatter alle variabler med sin nye verdi.
 betaReduce :: Expr n -> [(Text, Expr n)] -> Expr n
