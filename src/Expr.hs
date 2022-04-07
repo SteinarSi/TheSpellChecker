@@ -4,7 +4,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-overlapping-patterns #-}
 
-module Expr (Expr(..), Argument, Parameter, Function(Function), UnaryFunction(..), BinaryFunction(..), 
+module Expr (Expr(..), Argument, Parameter, Constant(..), Function(Function), UnaryFunction(..), BinaryFunction(..), 
     PrefixFunction(..), InfixFunction(..), bFunctions, uFunctions, bFuncFromName, uFuncFromName, bFuncFromConstr, uFuncFromConstr, isConstant, evalConstant,
      evalFunction, betaReduce, uFuncNames, bFuncNames) where
 
@@ -14,14 +14,14 @@ import Data.List (intercalate)
 import TextShow (TextShow(..), showbParen, showb, fromText, toText, toString)
 import Data.Maybe (listToMaybe)
 
-import Utility (realToRat, e)
+import Utility (realToRat)
 
 
 data Expr n = UFunc UnaryFunction (Expr n)
             | BFunc BinaryFunction (Expr n) (Expr n)
             | Num n
             | Var Text
-            | Const Text n
+            | Const Constant
     deriving Eq
 
 data Function n = Function Text [Parameter] (Expr n)
@@ -29,7 +29,11 @@ data Function n = Function Text [Parameter] (Expr n)
 type Argument n = (Text, n)
 type Parameter = Text
 
-data UnaryFunction = Sin | Cos | Tan | USub | Ceiling | Floor | Sqrt | Succ | Pred | Abs
+data Constant = Pi | E 
+    deriving (Eq, Show)
+
+data UnaryFunction = Sin | Cos | Tan | USub | Ceiling | Floor | Sqrt | Succ | Pred | Abs | Asin | Acos | Atan | Sinh | Cosh | Tanh
+                   | Asinh | Acosh | Atanh
     deriving (Eq, Show)
 
 data BinaryFunction = Prefix PrefixFunction
@@ -42,6 +46,12 @@ data PrefixFunction = Log | Max | Min
 data InfixFunction  = Add | BSub | Mult | Div | Expo
     deriving (Eq, Show)
 
+constants :: Floating n => [(Constant, Text, n)]
+constants = [
+        (Pi, "pi", pi),
+        (E, "e", 2.71828182845904523536028747)
+    ]
+
 uFunctions :: RealFloat n => [(UnaryFunction, Text, n -> n)]
 uFunctions = [
         (Sin, "sin", sin),
@@ -52,8 +62,17 @@ uFunctions = [
         (Floor, "floor", fromIntegral . floor),
         (Sqrt, "sqrt", sqrt),
         (Succ, "succ", (+1)),
-        (Pred, "pred", (-) 1),
-        (Abs, "abs", abs)
+        (Pred, "pred", subtract 1),
+        (Abs, "abs", abs),
+        (Asin, "asin", asin),
+        (Acos, "acos", acos),
+        (Atan, "atan", atan),
+        (Sinh, "sinh", sinh),
+        (Cosh, "cosh", cosh),
+        (Tanh, "tanh", tanh),
+        (Asinh, "asinh", asinh),
+        (Acosh, "acosh", acosh),
+        (Atanh, "atanh", atanh)
     ]
 
 bFunctions :: RealFloat n => [(BinaryFunction, Text, n -> n -> n)]
@@ -74,6 +93,9 @@ infixPrecedence Add  = 4
 infixPrecedence Div  = 5
 infixPrecedence Mult = 6
 infixPrecedence Expo = 7
+
+constantFromConstr :: Floating n => Constant -> (Constant, Text, n)
+constantFromConstr c = head [ f | f@(con, _, _)<-constants, con == c ]
 
 uFuncNames :: [Text]
 uFuncNames = [name | (_, name, _) <- uFunctions]
@@ -102,12 +124,12 @@ instance Eq (Function n) where
 
 
 instance (RealFloat n, TextShow n) => TextShow (Expr n) where
-    showbPrec p (Const name _) = fromText name
+    showbPrec p (Const c)   = let (_, name, _) = constantFromConstr c in fromText name
     showbPrec p (Num  a)    = showb a
     showbPrec p (Var v)     = fromText v
     showbPrec p (UFunc USub a) = showbParen (5 < p) ("-" <> showbPrec 5 a)
     showbPrec p (UFunc c a) = let (_, name, _) = uFuncFromConstr c in fromText name <> "(" <> showb a <> ")"
-    showbPrec p (BFunc (Prefix Log) a b) | a == Num e = "ln(" <> showb b <> ")"
+    showbPrec p (BFunc (Prefix Log) a b) | a == Const E = "ln(" <> showb b <> ")"
                                          | otherwise = "log[" <> showb a <> "](" <> showb b <> ")"
     showbPrec p (BFunc (Prefix c) a b) = let (_, name, _) = bFuncFromConstr (Prefix c) in fromText name <> "(" <> showb a <> ", " <> showb b <> ")"
     showbPrec p (BFunc (Infix c) a b) = let (_, op, _) = bFuncFromConstr (Infix c) 
@@ -128,28 +150,46 @@ instance Num n => Num (Expr n) where
 instance Fractional n => Fractional (Expr n) where
     (/) = BFunc (Infix Div)
     fromRational = Num . fromRational
+
+instance Floating n => Floating (Expr n) where
+    pi = Num pi
+    --exp = BFunc (Infix Expo) (Num e) TODOOO
+    --log = BFunc (Infix Expo) (Num) TOODOODDOOO
+    sin   = UFunc Sin
+    cos   = UFunc Cos
+    tan   = UFunc Tan
+    asin  = UFunc Asin
+    acos  = UFunc Acos
+    atan  = UFunc Atan
+    sinh  = UFunc Sinh
+    cosh  = UFunc Cosh
+    tanh  = UFunc Tanh
+    asinh = UFunc Asinh
+    acosh = UFunc Acosh
+    atanh = UFunc Atanh
+
     
 
 -- erstatter alle variabler med sin nye verdi.
 betaReduce :: Expr n -> [(Text, Expr n)] -> Expr n
-betaReduce (Const name n) _    = Const name n
+betaReduce (Const c)      _    = Const c
 betaReduce (Num n)        _    = Num n
 betaReduce (Var v)        args = head [ value | (name, value) <- args, v == name ]
 betaReduce (UFunc c a)    args = UFunc c (betaReduce a args)
 betaReduce (BFunc c a b)  args = BFunc c (betaReduce a args) (betaReduce b args)
 
 isConstant :: Expr n -> Bool
-isConstant (Var _) = False
-isConstant (Num _) = True
-isConstant (Const _ _) = True
-isConstant (UFunc _ a) = isConstant a
+isConstant (Var _)       = False
+isConstant (Num _)       = True
+isConstant (Const _)     = True
+isConstant (UFunc _ a)   = isConstant a
 isConstant (BFunc _ a b) = isConstant a && isConstant b
 
 -- Kræsjer om uttrykket ikke er en konstant.
 evalConstant :: RealFloat n => Expr n -> n
 evalConstant (Var _) = error "Unexpected variable in 'constant'"
 evalConstant (Num a) = a
-evalConstant (Const _ n) = n
+evalConstant (Const c) = let (_, _, n) = constantFromConstr c in n
 evalConstant (UFunc c a) = let (_, _, f) = uFuncFromConstr c in f (evalConstant a)
 evalConstant (BFunc c a b) = let (_, _, f) = bFuncFromConstr c in f (evalConstant a) (evalConstant b)
 
@@ -159,7 +199,7 @@ evalFunction (Function _ params ex) args | params == map fst args = Right $ eval
     where
         evalFunction' :: RealFloat n => Expr n -> [Argument n] -> n
         evalFunction' (Num a)        _ = a
-        evalFunction' (Const name n) _ = n
+        evalFunction' (Const c)      _ = let (_, _, n) = constantFromConstr c in n
         evalFunction' (Var v)        params = head [ value | (name, value) <- params, v == name ]
         evalFunction' (UFunc c a)    params = let (_, _, f) = uFuncFromConstr c in f (evalFunction' a params)
         evalFunction' (BFunc c a b)  params = let (_, _, f) = bFuncFromConstr c in f (evalFunction' a params) (evalFunction' b params)

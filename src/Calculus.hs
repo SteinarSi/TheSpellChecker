@@ -24,8 +24,8 @@ differentiate expr x = fmap simplify (diff (simplify expr) x)
 diff :: (RealFloat n, Show n, TextShow n) => Expr n -> Text -> Either Text (Expr n)
 
 -- a' = 0
-diff (Num n) _ = Right (Num 0)
-diff (Const name n) _ = Right (Const name n)
+diff (Num _) _ = Right (Num 0)
+diff (Const _) _ = Right (Num 0)
 
 -- x' = 1, y' = 0
 diff (Var v) x | v == x = Right (Num 1)
@@ -73,17 +73,17 @@ diff (BFunc (Infix Expo) f g) x = BFunc (Infix Mult)
         (BFunc (Infix Expo) f g) <$> 
         (BFunc (Infix Add) <$> 
             (BFunc (Infix Div) <$> (BFunc (Infix Mult) <$> diff f x <*> Right g) <*> Right f) <*> 
-            (BFunc (Infix Mult) <$> diff g x <*> Right (BFunc (Prefix Log) (Num e) f)))
+            (BFunc (Infix Mult) <$> diff g x <*> Right (BFunc (Prefix Log) (Const E) f)))
 
 -- (ln(g))' = (ln(g))' / g
-diff (BFunc (Prefix Log) f g) x | f == Num e = BFunc (Infix Div) <$> diff g x <*> Right g
+diff (BFunc (Prefix Log) f g) x | f == Const E = BFunc (Infix Div) <$> diff g x <*> Right g
 
                             -- logf(g)' = (g'*ln(f)/g - ln(g)*f'/f) / (ln(f))^2
                                 | otherwise = BFunc (Infix Div) <$> 
                                     (BFunc (Infix BSub) <$> 
-                                        (BFunc (Infix Div) <$> (BFunc (Infix Mult) <$> diff g x <*> Right (BFunc (Prefix Log) (Num e) f)) <*> Right g) <*> 
-                                        (BFunc (Infix Div) <$> (BFunc (Infix Mult) (BFunc (Prefix Log) (Num e) g) <$> diff f x) <*> Right f)) <*> 
-                                    Right (BFunc (Infix Expo) (BFunc (Prefix Log) (Num e) f) (Num 2))
+                                        (BFunc (Infix Div) <$> (BFunc (Infix Mult) <$> diff g x <*> Right (BFunc (Prefix Log) (Const E) f)) <*> Right g) <*> 
+                                        (BFunc (Infix Div) <$> (BFunc (Infix Mult) (BFunc (Prefix Log) (Const E) g) <$> diff f x) <*> Right f)) <*> 
+                                    Right (BFunc (Infix Expo) (BFunc (Prefix Log) (Const E) f) (Num 2))
 
 diff (BFunc (Prefix c) _ _) _ = let (_, name, _) = bFuncFromConstr (Prefix c) in Left ("The function " <> name <> "() has no defined derivative (yet)")
 diff (BFunc (Infix c)  _ _) _ = let (_, name, _) = bFuncFromConstr (Infix  c) in Left ("The operator " <> name <> " has no defined derivative (yet)")
@@ -118,7 +118,7 @@ simpX (BFunc (Infix Div) (BFunc (Infix Div) a b) (BFunc (Infix Div) c d)) = BFun
 
 -- Resten av casene, når ingen av reglene gjelder
 simpX (Num n) = Num n
-simpX (Const name n) = Const name n
+simpX (Const c) = Const c
 simpX (Var x) = Var x
 simpX (BFunc c a b) = BFunc c (simpC a) (simpC b)
 simpX (UFunc c a) = UFunc c (simpC a)

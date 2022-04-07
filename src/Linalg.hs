@@ -13,7 +13,7 @@ import Data.Proxy ( Proxy(Proxy) )
 import Data.Finite ( Finite, finite, finites, weakenN, getFinite)
 import Data.Bool (bool)
 import Data.Maybe (fromJust)
-import Control.Monad.Writer
+import Control.Monad.Writer (MonadWriter(tell, writer), runWriter, Writer)
 import Data.List (foldl')
 import Data.Function ((&))
 

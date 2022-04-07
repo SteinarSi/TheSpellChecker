@@ -117,9 +117,6 @@ zipMatrixWith f (Matrix u) (Matrix v) = Matrix (V.zipWith (V.zipWith f) u v)
 dot :: forall n a. (KnownNat n, Num a) => Vector n a -> Vector n a -> a
 dot = (sum .) . (*)
 
-aij :: forall m n a. (KnownNat m, KnownNat n) => (Finite (m+1), Finite (n+1)) -> Matrix (m+1) (n+1) a -> Matrix m n a
-aij (i, j) (Matrix v) = Matrix (fromJust (V.fromList (deleteNth (getFinite j) (map (fromJust . V.fromList . deleteNth (getFinite i) . V.toList) (V.toList v)))))
-
 (•) :: forall n a. (KnownNat n, Num a) => Vector n a -> Vector n a -> a
 (•) = dot
 

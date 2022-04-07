@@ -12,9 +12,6 @@ import Data.Number.CReal
 realToRat :: (Real a, Fractional b) => a -> b
 realToRat = fromRational . realToFrac
 
-e :: (RealFloat n, TextShow n) => n
-e = 2.71828182845904523536028747
-
 applyNtimesM :: Monad m => Int -> (a -> m a) -> a -> m a 
 applyNtimesM n f a = iterate (>>= f) (pure a) !! n
 

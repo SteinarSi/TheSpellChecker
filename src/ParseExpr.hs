@@ -82,12 +82,12 @@ parseNum :: (RealFloat n, Show n, TextShow n) => Parser n (Expr n)
 parseNum = try (Num <$> parseRealFloat)
        <|> try (char '(' *> parseExpr <* char ')')
        <|> try parseVar
-       <|> char 'e' $> Const "e" e
-       <|> try (string "pi" <|> string "Pi" <|> string "π") $> Const "pi" pi
+       <|> char 'e' $> Const E
+       <|> try (string "pi" <|> string "Pi" <|> string "π") $> Const Pi
        <|> parseFunctionCall
 
 parseFunctionCall :: (RealFloat n, Show n, TextShow n) => Parser n (Expr n)
-parseFunctionCall = try (BFunc (Prefix Log) (Num e) <$> ((string "log" <|> string "Log" <|> string "ln" <|> string "Ln") *> char '(' *> parseExpr <* char ')')) --log med e som base
+parseFunctionCall = try (BFunc (Prefix Log) (Const E) <$> ((string "log" <|> string "Log" <|> string "ln" <|> string "Ln") *> char '(' *> parseExpr <* char ')')) --log med e som base
        <|> try (BFunc (Prefix Log) <$> ((string "log" <|> string "Log") *> (char '[' *> parseExpr <* char ']' <|> fmap Num parseRealFloat)) <*> (char '(' *> parseExpr <* char ')')) -- log med custom base
        <|> try (do
             name <- first [ try (string fname) | (_, fname, _) <- uFunctions, fname /= "-"]
