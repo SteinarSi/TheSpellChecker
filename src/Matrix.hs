@@ -19,14 +19,14 @@ import Data.Maybe (listToMaybe, fromJust, catMaybes)
 import Control.Monad (join, (<=<))
 import Utility (deleteNth)
 
-import Debug.Trace
-
 
 type Vector m a = Matrix m 1 a
 newtype Matrix (m :: Nat) (n :: Nat) a = Matrix {unMatrix :: V.Vector n (V.Vector m a)} deriving (Foldable, Functor, Traversable, Eq)
 
 instance forall m n a. (KnownNat m, KnownNat n, Show a) => Show (Matrix m n a) where
-    show m = concatMap ((\(Matrix v) -> show (V.toList (V.head v)) ++ "\n") . (`row` m)) [0..finite (natVal @m Proxy - 1)]
+    show m | nS m == 1 = show (head $ V.toList (unMatrix m))
+           | otherwise = concatMap ((\(Matrix v) -> show (V.toList (V.head v)) ++ "\n") . (`row` m)) [0..finite (natVal @m Proxy - 1)]
+
 
 instance forall m n a. (KnownNat m, KnownNat n) => Applicative (Matrix m n) where
     (<*>) = zipMatrixWith ($)
@@ -50,11 +50,8 @@ repl = Matrix . V.replicate . V.replicate
 transpose :: forall m n a. (KnownNat m, KnownNat n) => Matrix m n a -> Matrix n m a
 transpose = rows
 
-index :: (KnownNat m, KnownNat n) => Matrix m n a -> (Finite m, Finite n) -> a
-index (Matrix v) (i, j) = V.index (V.index v j) i
-
 (!) :: (KnownNat m, KnownNat n) => Matrix m n a -> (Finite m, Finite n) -> a
-(!) = index
+(!) (Matrix v) (i, j) = V.index (V.index v j) i
 
 scale :: forall m n a. (KnownNat m, KnownNat n, Num a) => a -> Matrix m n a -> Matrix m n a
 scale a = fmap (a*)
@@ -80,7 +77,7 @@ scaleRow :: forall m n a. (KnownNat m, KnownNat n, Num a) => Finite m -> a -> Ma
 scaleRow r a m = transpose (scaleCol r a (transpose m))
 
 scaleCol :: forall m n a. (KnownNat m, KnownNat n, Num a) => Finite n -> a -> Matrix m n a -> Matrix m n a
-scaleCol c a (Matrix u) = Matrix (V.imap (\c' v -> if c == c' then fmap (a*) v else v) u)
+scaleCol c a (Matrix u) = Matrix (V.imap (\c' v -> bool v (fmap (a*) v) (c==c')) u)
 
 vector :: forall n a. V.Vector n a -> Vector n a
 vector = Matrix . V.singleton
@@ -109,14 +106,20 @@ col n (Matrix v) = Matrix (V.singleton (V.index v n))
 cols :: forall m n a. (KnownNat m, KnownNat n) => Matrix m n a -> Matrix m n a
 cols = id
 
+colList :: forall m n a. (KnownNat m, KnownNat n) => Matrix m n a -> [Vector m a]
+colList = map vector . V.toList . unMatrix
+
 row :: forall m n a. (KnownNat m, KnownNat n) => Finite m -> Matrix m n a -> Vector n a
 row m (Matrix v) = Matrix (V.singleton (V.map (`V.index` m) v))
 
 rows :: forall m n a. (KnownNat m, KnownNat n) => Matrix m n a -> Matrix n m a
 rows = Matrix . sequenceA . unMatrix
 
+rowList :: forall m n a. (KnownNat m, KnownNat n) => Matrix m n a -> [Vector n a]
+rowList = map vector . V.toList . unMatrix . rows
+
 diag :: forall m n a. (KnownNat m, KnownNat n) => Matrix m n a -> [a]
-diag a = map (\i -> a ! (finite i, finite i)) [0..min (natVal @m Proxy) (natVal @n Proxy) -1]
+diag a = map (\i -> a ! (finite i, finite i)) [0..min (nS a) (mS a)-1]
 
 unit :: forall m n b i. (KnownNat n, Num b) => Finite n -> Vector n b
 unit a = vector (V.generate (bool 0 1 . (==a)))
@@ -132,10 +135,6 @@ dot = (sum .) . (*)
 
 (•) :: forall n a. (KnownNat n, Num a) => Vector n a -> Vector n a -> a
 (•) = dot
-
--- take :: forall n m a. KnownNat n => Vector (n+m) a -> Vector n a 
-takeM :: forall n h a. (KnownNat n) => Vector (n+h) a -> Vector n a
-takeM = vector . V.take . expose 
 
 findindex :: forall n a. KnownNat n => Finite n -> (a -> Bool) -> Vector n a -> Maybe (Finite n)
 findindex u f a = find (>=u) (map (finite . fromIntegral) (findIndices f (V.toList (expose a))))

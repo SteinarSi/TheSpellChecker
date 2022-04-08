@@ -23,8 +23,6 @@ import Data.Function ((&))
 import qualified Data.Vector.Sized as V
 
 
-import Debug.Trace
-
 newtype VectorSpace n a = Span [Vector n a] deriving Show
 data Solution (n :: Nat) a = Unique (Vector n a) | Unlimited (Vector n a) (VectorSpace n a) | Inconsistent
     deriving Show
@@ -41,22 +39,20 @@ reduceWriter = reduceWriter' 0 0
                             Just i' -> do
                                 a' <- writer (swap i i' a, bool [] [negate] (i==i'))
                                 let scalar = a' ! (i, j)
+                                    a'' = addRow i j (scaleRow i (1 / scalar) a')
                                 tell [ (* scalar)]
-                                let a'' = addRow i j (scaleRow i (1 / scalar) a')
                                 bool (pure a'') (reduceWriter' (i+1) (j+1) a'') (getFinite i+1 < natVal @m Proxy && getFinite j+1 < natVal @n Proxy)
-                            
 
 solve :: forall m n a. (KnownNat m, KnownNat n, Fractional a, Eq a) => Matrix m n a -> Vector m a -> Solution n a
 solve a y | elem (nF reduced) (map snd ps) = Inconsistent
           | rank a == nS a = Unique s 
-          | otherwise = Unlimited s (Span counter)
-          
+          | otherwise = Unlimited s (Span paramCoeffs)
     where 
         reduced :: (KnownNat m, KnownNat n, Fractional a, Eq a) => Matrix m (n+1) a
         reduced = reduce (compose a y)
 
-        counter :: (KnownNat n, Fractional a, Eq a) => [Vector n a]
-        counter  = for freeVars (\j -> 
+        paramCoeffs :: (KnownNat n, Fractional a, Eq a) => [Vector n a]
+        paramCoeffs  = for freeVars (\j -> 
             unit j + vector (fromJust (V.fromList ([ -reduced ! (finite i, weaken j) | i<-[0..min (nS a) (mS a) -1]] ++ genericReplicate (abs (nS a - mS a)) 0))))
 
         freeVars :: [Finite n]
@@ -64,9 +60,8 @@ solve a y | elem (nF reduced) (map snd ps) = Inconsistent
         ps = pivotIndices reduced
 
         s :: Vector n a
-        s = let attempt  = ( [ reduced ! (finite i, nF reduced) | i <- [0..min (nS a) (mS a)-1]])
-                attempt2 = attempt ++ replicate (nS a - length attempt) 0
-            in  vector $ fromJust $ V.fromList attempt2
+        s = let aug  = ( [ reduced ! (finite i, nF reduced) | i <- [0..min (nS a) (mS a)-1]])
+            in  vector $ fromJust $ V.fromList $ aug ++ replicate (nS a - length aug) 0
 
 det :: forall m n a. (KnownNat m, KnownNat n, Fractional a, Eq a) => Matrix m n a -> a
 det a | natVal @n Proxy /= natVal @m Proxy = 0
@@ -76,19 +71,22 @@ det a | natVal @n Proxy /= natVal @m Proxy = 0
 rank :: forall m n a i. (KnownNat m, KnownNat n, Fractional a, Eq a, Num i) => Matrix m n a -> i
 rank = genericLength . pivotIndices . reduce
 
-
 leastSquares :: forall m n a. (KnownNat m, KnownNat n, Fractional a, Eq a) => Matrix m n a -> Vector m a -> Vector n a
 leastSquares a y = s
     where Unique s = solve (transpose a >< a) (transpose a >< y)
 
 nulSpace :: forall m n a. (KnownNat m, KnownNat n, Fractional a, Eq a) => Matrix m n a -> VectorSpace n a
 nulSpace a = case solve a 0 of
-    Unique _ -> Span []
+    Unique _      -> Span []
     Unlimited _ p -> p
-    _ -> error "bruh"
+    Inconsistent  -> error "A system like Ax=0 having no solutions *should* be impossible, yet here we are."
 
---rowSpace :: forall m n a. (KnownNat m, KnownNat n, Fractional a, Eq a) => Matrix m n a -> VectorSpace m a
---rowSpace 
+rowSpace :: forall m n a. (KnownNat m, KnownNat n, Fractional a, Eq a) => Matrix m n a -> VectorSpace n a
+rowSpace = Span . filter (/=0) . rowList
+
+colSpace :: forall m n a. (KnownNat m, KnownNat n, Fractional a, Eq a) => Matrix m n a -> VectorSpace m a
+colSpace a = Span $ map (\(_, j) -> col j r) (pivotIndices r)
+    where r = reduce a
 
 
 a :: Matrix 3 3 Double
