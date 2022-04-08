@@ -153,8 +153,8 @@ instance Fractional n => Fractional (Expr n) where
 
 instance Floating n => Floating (Expr n) where
     pi = Num pi
-    --exp = BFunc (Infix Expo) (Num e) TODOOO
-    --log = BFunc (Infix Expo) (Num) TOODOODDOOO
+    exp = BFunc (Infix Expo) (Const E)
+    log = BFunc (Infix Expo) (Const E)
     sin   = UFunc Sin
     cos   = UFunc Cos
     tan   = UFunc Tan

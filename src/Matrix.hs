@@ -11,14 +11,15 @@ import qualified Data.Vector.Sized as V
 import Data.List.Split (chunksOf)
 import Data.Finite (Finite, finite, getFinite)
 import Control.Applicative (liftA2)
-import Prelude hiding (compose, replicate)
+import Prelude hiding (compose)
 import Data.Type.Bool (If)
-import Data.Type.Coercion (trans)
 import Data.Bool (bool)
 import Data.List (findIndices, find)
-import Data.Maybe (listToMaybe, fromJust)
+import Data.Maybe (listToMaybe, fromJust, catMaybes)
 import Control.Monad (join, (<=<))
 import Utility (deleteNth)
+
+import Debug.Trace
 
 
 type Vector m a = Matrix m 1 a
@@ -29,7 +30,7 @@ instance forall m n a. (KnownNat m, KnownNat n, Show a) => Show (Matrix m n a) w
 
 instance forall m n a. (KnownNat m, KnownNat n) => Applicative (Matrix m n) where
     (<*>) = zipMatrixWith ($)
-    pure = replicate
+    pure = repl
 
 instance forall m n a. (KnownNat m, KnownNat n, Num a) => Num (Matrix m n a) where
     (+) = liftA2 (+)
@@ -43,14 +44,11 @@ instance forall m n a. (KnownNat m, KnownNat n, Num a) => Num (Matrix m n a) whe
 (><) :: forall m n h a. (KnownNat m, KnownNat n, KnownNat h, Num a) => Matrix m n a -> Matrix n h a -> Matrix m h a
 (><) a b = Matrix (V.generate (\c -> V.generate (\r -> row r a • col c b)))
 
-replicate :: forall m n a. (KnownNat m, KnownNat n) => a -> Matrix m n a
-replicate = Matrix . V.replicate . V.replicate
+repl :: forall m n a. (KnownNat m, KnownNat n) => a -> Matrix m n a
+repl = Matrix . V.replicate . V.replicate
 
 transpose :: forall m n a. (KnownNat m, KnownNat n) => Matrix m n a -> Matrix n m a
 transpose = rows
-
-zero :: forall m n a. (KnownNat m, KnownNat n, Num a) => Matrix m n a
-zero = 0
 
 index :: (KnownNat m, KnownNat n) => Matrix m n a -> (Finite m, Finite n) -> a
 index (Matrix v) (i, j) = V.index (V.index v j) i
@@ -61,8 +59,11 @@ index (Matrix v) (i, j) = V.index (V.index v j) i
 scale :: forall m n a. (KnownNat m, KnownNat n, Num a) => a -> Matrix m n a -> Matrix m n a
 scale a = fmap (a*)
 
-pivots :: forall m n a. (KnownNat m, KnownNat n, Num a) => Matrix m n a -> [(Finite m, Finite n)]
-pivots a = undefined 
+pivots :: forall m n a. (KnownNat m, KnownNat n, Num a, Eq a) => Matrix m n a -> [a]
+pivots a = map (a !) $ pivotIndices a
+
+pivotIndices :: forall m n a. (KnownNat m, KnownNat n, Num a, Eq a) => Matrix m n a -> [(Finite m, Finite n)]
+pivotIndices = catMaybes . V.toList . V.imap (\i v -> listToMaybe $ catMaybes $ V.toList $ V.imap (\j x -> bool Nothing (Just (i, j)) (x/=0)) v) . unMatrix . rows
 
 fromList :: forall m n a. (KnownNat m, KnownNat n) => [[a]] -> Maybe (Matrix m n a)
 fromList = fmap (transpose . Matrix) . V.fromList <=< mapM V.fromList
@@ -90,6 +91,18 @@ expose (Matrix v) = V.head v
 compose :: Matrix m n a -> Matrix m h a -> Matrix m (n+h) a
 compose (Matrix u) (Matrix v) = Matrix (u V.++ v)
 
+mF :: forall m n a. (KnownNat m) => Matrix m n a -> Finite m
+mF _ = fromInteger (natVal @m Proxy - 1)
+
+nF :: forall m n a. (KnownNat n) => Matrix m n a -> Finite n
+nF _ = fromInteger (natVal @n Proxy - 1)
+
+mS :: forall m n a i. (KnownNat m, Num i) => Matrix m n a -> i
+mS _ = fromInteger $ natVal @m Proxy
+
+nS :: forall m n a i. (KnownNat n, Num i) => Matrix m n a -> i
+nS _ = fromInteger $ natVal @n Proxy
+
 col :: forall m n a. (KnownNat n) => Finite n -> Matrix m n a -> Vector m a
 col n (Matrix v) = Matrix (V.singleton (V.index v n))
 
@@ -106,7 +119,7 @@ diag :: forall m n a. (KnownNat m, KnownNat n) => Matrix m n a -> [a]
 diag a = map (\i -> a ! (finite i, finite i)) [0..min (natVal @m Proxy) (natVal @n Proxy) -1]
 
 unit :: forall m n b i. (KnownNat n, Num b) => Finite n -> Vector n b
-unit a = vector (V.generate (\i -> if i == a then 1 else 0))
+unit a = vector (V.generate (bool 0 1 . (==a)))
 
 identity :: forall n a. (KnownNat n, Num a) => Matrix n n a
 identity = Matrix (V.generate (expose . unit))
@@ -120,5 +133,9 @@ dot = (sum .) . (*)
 (•) :: forall n a. (KnownNat n, Num a) => Vector n a -> Vector n a -> a
 (•) = dot
 
+-- take :: forall n m a. KnownNat n => Vector (n+m) a -> Vector n a 
+takeM :: forall n h a. (KnownNat n) => Vector (n+h) a -> Vector n a
+takeM = vector . V.take . expose 
+
 findindex :: forall n a. KnownNat n => Finite n -> (a -> Bool) -> Vector n a -> Maybe (Finite n)
-findindex u f a = find (>= u) (map (finite . fromIntegral) (findIndices f (V.toList (expose a))))
+findindex u f a = find (>=u) (map (finite . fromIntegral) (findIndices f (V.toList (expose a))))

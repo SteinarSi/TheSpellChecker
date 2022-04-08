@@ -20,6 +20,9 @@ deleteNth _ [] = []
 deleteNth 0 (_:xs) = xs
 deleteNth n (x:xs) = x : deleteNth (n-1) xs
 
+for :: [a] -> (a -> b) -> [b]
+for = flip map
+
 instance TextShow CReal where
     showb = fromString . showCReal 3
 
