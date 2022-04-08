@@ -79,7 +79,8 @@ parseParam :: Parser n String
 parseParam = many1 letter
 
 parseNum :: (RealFloat n, Show n, TextShow n) => Parser n (Expr n)
-parseNum = try (Num <$> parseRealFloat)
+parseNum = try (R <$> parseRealFloat)
+       <|> try (Z <$> parseInteger)
        <|> try (char '(' *> parseExpr <* char ')')
        <|> try parseVar
        <|> char 'e' $> Const E
@@ -88,7 +89,7 @@ parseNum = try (Num <$> parseRealFloat)
 
 parseFunctionCall :: (RealFloat n, Show n, TextShow n) => Parser n (Expr n)
 parseFunctionCall = try (BFunc (Prefix Log) (Const E) <$> ((string "log" <|> string "Log" <|> string "ln" <|> string "Ln") *> char '(' *> parseExpr <* char ')')) --log med e som base
-       <|> try (BFunc (Prefix Log) <$> ((string "log" <|> string "Log") *> (char '[' *> parseExpr <* char ']' <|> fmap Num parseRealFloat)) <*> (char '(' *> parseExpr <* char ')')) -- log med custom base
+       <|> try (BFunc (Prefix Log) <$> ((string "log" <|> string "Log") *> (char '[' *> parseExpr <* char ']' <|> fmap Z parseInteger)) <*> (char '(' *> parseExpr <* char ')')) -- log med custom base
        <|> try (do
             name <- first [ try (string fname) | (_, fname, _) <- uFunctions, fname /= "-"]
             let Just (c, _, _) = uFuncFromName name

@@ -19,7 +19,8 @@ import Utility (realToRat)
 
 data Expr n = UFunc UnaryFunction (Expr n)
             | BFunc BinaryFunction (Expr n) (Expr n)
-            | Num n
+            | Z Integer
+            | R n
             | Var Text
             | Const Constant
     deriving Eq
@@ -125,7 +126,8 @@ instance Eq (Function n) where
 
 instance (RealFloat n, TextShow n) => TextShow (Expr n) where
     showbPrec p (Const c)   = let (_, name, _) = constantFromConstr c in fromText name
-    showbPrec p (Num  a)    = showb a
+    showbPrec p (Z n)     = showb n
+    showbPrec p (R  a)    = showb a
     showbPrec p (Var v)     = fromText v
     showbPrec p (UFunc USub a) = showbParen (5 < p) ("-" <> showbPrec 5 a)
     showbPrec p (UFunc c a) = let (_, name, _) = uFuncFromConstr c in fromText name <> "(" <> showb a <> ")"
@@ -145,14 +147,14 @@ instance Num n => Num (Expr n) where
     (*) = BFunc (Infix Mult)
     signum = undefined 
     abs = UFunc Abs
-    fromInteger = Num . fromInteger
+    fromInteger = Z . fromInteger
 
 instance Fractional n => Fractional (Expr n) where
     (/) = BFunc (Infix Div)
-    fromRational = Num . fromRational
+    fromRational = R . fromRational
 
 instance Floating n => Floating (Expr n) where
-    pi = Num pi
+    pi = R pi
     exp = BFunc (Infix Expo) (Const E)
     log = BFunc (Infix Expo) (Const E)
     sin   = UFunc Sin
@@ -173,24 +175,27 @@ instance Floating n => Floating (Expr n) where
 -- erstatter alle variabler med sin nye verdi.
 betaReduce :: Expr n -> [(Text, Expr n)] -> Expr n
 betaReduce (Const c)      _    = Const c
-betaReduce (Num n)        _    = Num n
+betaReduce (Z z)          _    = Z z
+betaReduce (R r)          _    = R r
 betaReduce (Var v)        args = head [ value | (name, value) <- args, v == name ]
 betaReduce (UFunc c a)    args = UFunc c (betaReduce a args)
 betaReduce (BFunc c a b)  args = BFunc c (betaReduce a args) (betaReduce b args)
 
 isConstant :: Expr n -> Bool
 isConstant (Var _)       = False
-isConstant (Num _)       = True
+isConstant (Z _)         = True
+isConstant (R _)         = True
 isConstant (Const _)     = True
 isConstant (UFunc _ a)   = isConstant a
 isConstant (BFunc _ a b) = isConstant a && isConstant b
 
 -- Kræsjer om uttrykket ikke er en konstant.
 evalConstant :: RealFloat n => Expr n -> n
-evalConstant (Var _) = error "Unexpected variable in 'constant'"
-evalConstant (Num a) = a
-evalConstant (Const c) = let (_, _, n) = constantFromConstr c in n
-evalConstant (UFunc c a) = let (_, _, f) = uFuncFromConstr c in f (evalConstant a)
+evalConstant (Var _)       = error "Unexpected variable in 'constant'"
+evalConstant (Z z)         = fromInteger z
+evalConstant (R r)         = r
+evalConstant (Const c)     = let (_, _, n) = constantFromConstr c in n
+evalConstant (UFunc c a)   = let (_, _, f) = uFuncFromConstr c in f (evalConstant a)
 evalConstant (BFunc c a b) = let (_, _, f) = bFuncFromConstr c in f (evalConstant a) (evalConstant b)
 
 evalFunction :: RealFloat n => Function n -> [Argument n] -> Either Text n
@@ -198,11 +203,9 @@ evalFunction (Function _ params ex) args | params == map fst args = Right $ eval
                                          | otherwise = Left ("Function arguments did not match function parameters: " <> toText (showb (map fst args)) <> " vs " <> toText (showb params))
     where
         evalFunction' :: RealFloat n => Expr n -> [Argument n] -> n
-        evalFunction' (Num a)        _ = a
+        evalFunction' (R r)          _ = r
+        evalFunction' (Z z)          _ = fromInteger z
         evalFunction' (Const c)      _ = let (_, _, n) = constantFromConstr c in n
         evalFunction' (Var v)        params = head [ value | (name, value) <- params, v == name ]
         evalFunction' (UFunc c a)    params = let (_, _, f) = uFuncFromConstr c in f (evalFunction' a params)
         evalFunction' (BFunc c a b)  params = let (_, _, f) = bFuncFromConstr c in f (evalFunction' a params) (evalFunction' b params)
-
-
-

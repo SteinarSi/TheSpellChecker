@@ -37,6 +37,9 @@ parseRealFloat = do
         Left err     -> fail err
         Right (n, _) -> pure (realToRat n)
 
+parseInteger :: Parser n Integer
+parseInteger = read <$> many1 digit
+
 digit :: Parser n Char
 digit = oneOf ['0'..'9']
 
