@@ -103,9 +103,9 @@ parseFunctionCall = try (BFunc (Prefix Log) (Const E) <$> ((string "log" <|> str
             (fs, _) <- lift get
             case [ f | f@(Function fname _ _)<-fs, name == fname ] of
                 [] -> failT ("Unrecognized function: " <> name)
-                (Function fname params ex:_) -> do
+                (f@(Function fname params ex):_) -> do
                     char '('
                     args <- replicateM (length params) (tryWhatever (char ',') parseExpr)
                     char ')'
-                    pure (betaReduce ex (zip params args))
+                    pure (FFunc f args)
        )

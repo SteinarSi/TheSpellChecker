@@ -17,7 +17,6 @@ import Calculus (simplify)
 
 
 
--- TODO, gjør om til REPL
 loop :: [Function Double] -> IO ()
 loop fs = do
     inn <- getLine
@@ -27,8 +26,8 @@ loop fs = do
             Help -> readFile "data/help.txt" >>= putStrLn >> loop fs
             Quit -> putStrLn "Bye-bye!"
             NewFunction f@(Function name params ex) -> do
-                putStrLn ("I parsed the function like this: " ++ debug f)
-                putStrLn ("And it was simplified to this: " ++ debug (simplify ex))
+                putStrLn ("I parsed the function like this: " ++ show f)
+                putStrLn ("And it was simplified to this: " ++ show (simplify ex))
                 loop (Function name params (simplify ex) : delete f fs)
-            EvalConstant ex -> putStrLn (toString (showb ex <> " = " <> showb (evalConstant ex))) >> loop fs
+            Eval ex -> putStrLn (toString (showb ex <> " = " <> showb (evalConstant ex))) >> loop fs
             ShowFunction f -> print f >> loop fs

@@ -4,21 +4,25 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-overlapping-patterns #-}
 
-module Expr (Expr(..), Argument, Parameter, Constant(..), Function(Function), UnaryFunction(..), BinaryFunction(..), 
-    PrefixFunction(..), InfixFunction(..), bFunctions, uFunctions, bFuncFromName, uFuncFromName, bFuncFromConstr, uFuncFromConstr, isConstant, evalConstant,
-     evalFunction, betaReduce, uFuncNames, bFuncNames, debug) where
+module Expr (Expr(..), Argument, Parameter, Constant(..), Function(Function), UnaryFunction(..), BinaryFunction(..),
+    PrefixFunction(..), InfixFunction(..), bFunctions, uFunctions, bFuncFromName, uFuncFromName, bFuncFromConstr, uFuncFromConstr, isConstant,
+     evalFunction, betaReduce, uFuncNames, bFuncNames, debug, evalConstant) where
 
 import Data.Number.RealCyclotomic (RealCyclotomic, toReal, toRat)
 import Data.Text (Text, unpack, pack, toLower)
-import Data.List (intercalate)
+import qualified Data.Text as T
+import Data.List (intercalate, foldr1, intersperse)
 import TextShow (TextShow(..), showbParen, showb, fromText, toText, toString)
 import Data.Maybe (listToMaybe)
+
+import Debug.Trace
 
 import Utility (realToRat, Debug(debug))
 
 
 data Expr n = UFunc UnaryFunction (Expr n)
             | BFunc BinaryFunction (Expr n) (Expr n)
+            | FFunc (Function n) [Expr n]
             | Z Integer
             | R n
             | Var Text
@@ -27,10 +31,10 @@ data Expr n = UFunc UnaryFunction (Expr n)
 
 data Function n = Function Text [Parameter] (Expr n)
 
-type Argument n = (Text, n)
+type Argument n = Expr n
 type Parameter = Text
 
-data Constant = Pi | E 
+data Constant = Pi | E
     deriving (Eq, Show)
 
 data UnaryFunction = Sin | Cos | Tan | USub | Ceiling | Floor | Sqrt | Succ | Pred | Abs | Asin | Acos | Atan | Sinh | Cosh | Tanh
@@ -123,8 +127,10 @@ instance (Floating n, TextShow n) => Show (Function n) where
 instance Eq (Function n) where
     (Function name1 _ _) == (Function name2 _ _) = name1 == name2
 
-
+-- debug (Function name params expr) = unpack name <> "(" <> intercalate "," (map unpack params) <> ") = " <> debug expr
 instance (Floating n, TextShow n) => TextShow (Expr n) where
+    showbPrec p (FFunc (Function name [] _) _) = fromText name
+    showbPrec p (FFunc (Function name _ _) args) = fromText name <> "(" <> foldr1 ((<>) . (<> ",")) (map showb args) <> ")"
     showbPrec p (Const c)   = let (_, name, _) = constantFromConstr c in fromText name
     showbPrec p (Z n)     = showb n
     showbPrec p (R  a)    = showb a
@@ -134,7 +140,7 @@ instance (Floating n, TextShow n) => TextShow (Expr n) where
     showbPrec p (BFunc (Prefix Log) (Const E) b) = "ln(" <> showb b <> ")"
     showbPrec p (BFunc (Prefix Log) a b) = "log[" <> showb a <> "](" <> showb b <> ")"
     showbPrec p (BFunc (Prefix c) a b) = let (_, name, _) = bFuncFromConstr (Prefix c) in fromText name <> "(" <> showb a <> ", " <> showb b <> ")"
-    showbPrec p (BFunc (Infix c) a b) = let (_, op, _) = bFuncFromConstr (Infix c) 
+    showbPrec p (BFunc (Infix c) a b) = let (_, op, _) = bFuncFromConstr (Infix c)
                                             opPrec = infixPrecedence c
                                         in  showbParen (opPrec < p) (showbPrec opPrec a <> fromText op <> showbPrec opPrec b)
 
@@ -145,7 +151,7 @@ instance Num n => Num (Expr n) where
     (+) = BFunc (Infix Add)
     (-) = BFunc (Infix BSub)
     (*) = BFunc (Infix Mult)
-    signum = undefined 
+    signum = undefined
     abs = UFunc Abs
     fromInteger = Z . fromInteger
 
@@ -180,12 +186,13 @@ instance Debug PrefixFunction where
     debug = show
 
 instance Show n => Debug (Expr n) where
+    debug (FFunc (Function name _ _) args) = unpack name <> "(" <> intercalate "," (map debug args) <> ")"
     debug (Const c) = show c
     debug (Z z) = show z
     debug (R r) = show r
     debug (UFunc c e) = "(" <> debug c <> " " <> debug e <> ")"
     debug (UFunc c e) = "(" <> debug c <> " " <> debug e <> ")"
-    debug (BFunc (Infix c) a b) = let (_, n, _) = bFuncFromConstr (Infix c) 
+    debug (BFunc (Infix c) a b) = let (_, n, _) = bFuncFromConstr (Infix c)
                                   in "(" <> debug a <> " " <> unpack n <> " " <> debug b <>")"
     debug (BFunc (Prefix c) a b) = "(" <> debug c <> " " <> debug a <> " " <> debug b <> ")"
     debug (Var x) = "(Var " <> unpack x <> ")"
@@ -195,12 +202,18 @@ instance Show n => Debug (Function n) where
 
 -- erstatter alle variabler med sin nye verdi.
 betaReduce :: Expr n -> [(Text, Expr n)] -> Expr n
-betaReduce (Const c)      _    = Const c
-betaReduce (Z z)          _    = Z z
-betaReduce (R r)          _    = R r
-betaReduce (Var v)        args = head [ value | (name, value) <- args, v == name ]
-betaReduce (UFunc c a)    args = UFunc c (betaReduce a args)
-betaReduce (BFunc c a b)  args = BFunc c (betaReduce a args) (betaReduce b args)
+betaReduce = betaReduce' []
+    where
+        betaReduce' :: [Text] -> Expr n -> [(Text, Expr n)] -> Expr n
+        betaReduce' bounded (Const c)      _    = Const c
+        betaReduce' bounded (Z z)          _    = Z z
+        betaReduce' bounded (R r)          _    = R r
+        betaReduce' bounded (Var v)        args | v `elem` bounded = Var v
+                                                | otherwise = head [ value | (name, value) <- args, v == name ]
+        betaReduce' bounded (UFunc c a)    args = UFunc c (betaReduce' bounded a args)
+        betaReduce' bounded (BFunc c a b)  args = BFunc c (betaReduce' bounded a args) (betaReduce' bounded b args)
+        betaReduce' bounded (FFunc (Function name params expr) funcargs) args = 
+            FFunc (Function name params (betaReduce' (params ++ bounded) expr args)) (map (\a -> betaReduce' bounded a args) funcargs)
 
 isConstant :: Expr n -> Bool
 isConstant (Var _)       = False
@@ -209,24 +222,19 @@ isConstant (R _)         = True
 isConstant (Const _)     = True
 isConstant (UFunc _ a)   = isConstant a
 isConstant (BFunc _ a b) = isConstant a && isConstant b
+isConstant (FFunc (Function _ params expr) args) = isConstant (betaReduce expr (zip params args))
+
 
 -- Kræsjer om uttrykket ikke er en konstant.
-evalConstant :: RealFloat n => Expr n -> n
-evalConstant (Var _)       = error "Unexpected variable in 'constant'"
+evalConstant :: (Show n, RealFloat n) => Expr n -> n
+evalConstant (Var x)       = error ("Unexpected variable in 'constant': " <> unpack x)
 evalConstant (Z z)         = fromInteger z
 evalConstant (R r)         = r
 evalConstant (Const c)     = let (_, _, n) = constantFromConstr c in n
 evalConstant (UFunc c a)   = let (_, _, f) = uFuncFromConstr c in f (evalConstant a)
 evalConstant (BFunc c a b) = let (_, _, f) = bFuncFromConstr c in f (evalConstant a) (evalConstant b)
+evalConstant (FFunc f@(Function name params expr) args) = evalConstant (betaReduce expr (zip params args))
 
-evalFunction :: RealFloat n => Function n -> [Argument n] -> Either Text n
-evalFunction (Function _ params ex) args | params == map fst args = Right $ evalFunction' ex args
-                                         | otherwise = Left ("Function arguments did not match function parameters: " <> toText (showb (map fst args)) <> " vs " <> toText (showb params))
-    where
-        evalFunction' :: RealFloat n => Expr n -> [Argument n] -> n
-        evalFunction' (R r)          _ = r
-        evalFunction' (Z z)          _ = fromInteger z
-        evalFunction' (Const c)      _ = let (_, _, n) = constantFromConstr c in n
-        evalFunction' (Var v)        params = head [ value | (name, value) <- params, v == name ]
-        evalFunction' (UFunc c a)    params = let (_, _, f) = uFuncFromConstr c in f (evalFunction' a params)
-        evalFunction' (BFunc c a b)  params = let (_, _, f) = bFuncFromConstr c in f (evalFunction' a params) (evalFunction' b params)
+evalFunction :: (Show n, RealFloat n) => Function n -> [Argument n] -> Either Text n
+evalFunction (Function _ params ex) args | length params == length args = Right $ evalConstant (betaReduce ex (zip params args))
+                                         | otherwise = Left (pack ("Wrong number of arguments; expected " <> show (length params) <> ", but got " <> show (length args)))

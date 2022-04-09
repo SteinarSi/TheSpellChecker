@@ -14,8 +14,6 @@ import Control.Monad.State.Lazy (get, put, modify)
 import Control.Monad.Trans (lift)
 import Data.Maybe (listToMaybe, maybe)
 
-import Debug.Trace
-
 import Expr
 import ParserUtility ( failT, letter, many1, tryWhatever, Parser )
 import ParseExpr ( parseExpr )
@@ -25,8 +23,8 @@ import Utility (applyNtimesM)
 
 
 data Command n = NewFunction (Function n)
-               | EvalConstant (Expr n)
                | ShowFunction (Function n)
+               | Eval (Expr n)
                | Quit
                | Help
 
@@ -34,15 +32,8 @@ parseCommand :: (RealFloat n) => Parser n (Command n)
 parseCommand = try (Help <$ (string "help" <|> string "Help" <|> string "h") <* eof)   
            <|> try (Quit <$ (string "quit" <|> string "q" <|> string "Quit") <* eof)
            <|> try (ShowFunction <$> parseFunctionName <* eof)
-           <|> try (EvalConstant <$> parseConstant <* eof)
+           <|> try (Eval <$> parseExpr <* eof)
            <|> try (NewFunction <$> (Function <$> parseName <*> (char '(' *> parseParams <* char ')' <* char '=') <*> parseExpr <* eof))
-           
-
-parseConstant :: (RealFloat n) => Parser n (Expr n)
-parseConstant = do
-    e <- parseExpr 
-    if isConstant e then pure e 
-    else fail "Function argument has to be a constant expression"
 
 parseFunctionName :: (RealFloat n) => Parser n (Function n)
 parseFunctionName = do
@@ -58,10 +49,6 @@ parseFunctionName = do
 
 parseName :: Parser n Text
 parseName = T.pack <$> many letter
-
-parseArgs :: (RealFloat n) => [Parameter] -> Parser n [Argument n]
-parseArgs [] = pure []
-parseArgs (p:ps) = (:) . (,) p <$> fmap evalConstant parseConstant <*> tryWhatever (char ',') (parseArgs ps)
 
 parseParams :: (RealFloat n) => Parser n [Parameter]
 parseParams = (do

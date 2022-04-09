@@ -112,6 +112,10 @@ simp (BFunc (Infix Add) (Z z1) (Z z2)) = Z (z1+z2)
 simp (BFunc (Infix Add) (R r1) (R r2)) = R (r1+r2)
 
 simp (UFunc USub (UFunc USub a)) = simp a             -- -(-a) = a
+simp (BFunc (Infix BSub) (Z 0) b) = UFunc USub (simp b)
+simp (BFunc (Infix BSub) (R 0) b) = UFunc USub (simp b)
+simp (BFunc (Infix BSub) b (Z 0)) = simp b
+simp (BFunc (Infix BSub) b (R 0)) = simp b
 
 simp (BFunc (Infix Mult) a (Z 1)) = simp a            -- a * 1 = a
 simp (BFunc (Infix Mult) a (R 1)) = simp a
@@ -141,6 +145,7 @@ simp (Const c) = Const c
 simp (Var x) = Var x
 simp (BFunc c a b) = BFunc c (simp a) (simp b)
 simp (UFunc c a) = UFunc c (simp a)
+simp (FFunc (Function name params expr) args) = FFunc (Function name params (simp expr)) (map simp args)
 
 
 
