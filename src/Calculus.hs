@@ -15,13 +15,15 @@ import Expr
 import Utility
 
 
+--simplifyFunction :: Function n -> Function n
+--simplifyFunction (Function name params ex) = Function name params (simplify ex)
 
-differentiate :: (RealFloat n, Show n, TextShow n) => Expr n -> Text -> Either Text (Expr n)
+differentiate :: (RealFloat n) => Expr n -> Text -> Either Text (Expr n)
 differentiate expr x = fmap simplify (diff (simplify expr) x)
 
 
 
-diff :: (RealFloat n, Show n, TextShow n) => Expr n -> Text -> Either Text (Expr n)
+diff :: (RealFloat n) => Expr n -> Text -> Either Text (Expr n)
 
 -- a' = 0
 diff (Z _) _ = Right (Z 0)
@@ -92,45 +94,53 @@ diff (UFunc c _) _ = let (_, name, _) = uFuncFromConstr c in Left ("The function
 
 
 -- TODOOOO
-simplify :: (RealFloat n, TextShow n, Show n) => Expr n -> Expr n
-simplify ex | simpC ex == ex = ex
-            | otherwise = simplify (simpC ex)
+simplify :: (RealFloat n) => Expr n -> Expr n
+simplify ex | simp ex == ex = ex
+            | otherwise = simplify (simp ex)
 
-simpC :: (RealFloat n, TextShow n, Show n) => Expr n -> Expr n
-simpC ex | isConstant ex = R (evalConstant ex)
-         | otherwise = simpX ex
+simp :: (RealFloat n) => Expr n -> Expr n
+simp (R r) | r == fromInteger (round r) = Z (round r)      -- a.0 = a
 
-simpX :: (RealFloat n, TextShow n, Show n) => Expr n -> Expr n
-simpX (BFunc (Infix Add) a (Z 0)) = simpC a
-simpX (BFunc (Infix Add) a (R 0)) = simpC a
-simpX (BFunc (Infix Add) (R 0) b) = simpC b
-simpX (BFunc (Infix Add) (Z 0) b) = simpC b
-simpX (BFunc (Infix Add) a (UFunc USub b)) = simpC (BFunc (Infix BSub) a b)
-simpX (BFunc (Infix Add) (UFunc USub b) a) = simpC (BFunc (Infix BSub) a b)
+simp (BFunc (Infix Add) a (Z 0)) = simp a                 -- a + 0 = a
+simp (BFunc (Infix Add) a (R 0)) = simp a
+simp (BFunc (Infix Add) (R 0) b) = simp b                 -- 0 + a = a
+simp (BFunc (Infix Add) (Z 0) b) = simp b
+simp (BFunc (Infix Add) a (UFunc USub b)) = simp (BFunc (Infix BSub) a b)     -- a + (-b) = a - b
+simp (BFunc (Infix Add) (UFunc USub b) a) = simp (BFunc (Infix BSub) a b)     -- (-b) + a = a - b
 
-simpX (UFunc USub (UFunc USub a)) = simpC a
+simp (BFunc (Infix Add) (Z z1) (Z z2)) = Z (z1+z2)
+simp (BFunc (Infix Add) (R r1) (R r2)) = R (r1+r2)
 
-simpX (BFunc (Infix Mult) a (Z 1)) = simpC a
-simpX (BFunc (Infix Mult) a (R 1)) = simpC a
-simpX (BFunc (Infix Mult) (Z 1) b) = simpC b
-simpX (BFunc (Infix Mult) (R 1) b) = simpC b
-simpX (BFunc (Infix Mult) _ (R 0)) = Z 0
-simpX (BFunc (Infix Mult) _ (Z 0)) = Z 0
-simpX (BFunc (Infix Mult) (R 0) _) = Z 0
-simpX (BFunc (Infix Mult) (Z 0) _) = Z 0
-simpX (BFunc (Infix Mult) (BFunc (Infix Div) a b) (BFunc (Infix Div) c d)) = BFunc (Infix Div) (BFunc (Infix Mult) (simpC a) (simpC c)) (BFunc (Infix Mult) (simpC b) (simpC d))
+simp (UFunc USub (UFunc USub a)) = simp a             -- -(-a) = a
 
-simpX (BFunc (Infix Div) (BFunc (Infix Div) a b) (BFunc (Infix Div) c d)) = BFunc (Infix Div) (BFunc (Infix Mult) (simpC a) (simpC d)) (BFunc (Infix Mult) (simpC b) (simpC c))
+simp (BFunc (Infix Mult) a (Z 1)) = simp a            -- a * 1 = a
+simp (BFunc (Infix Mult) a (R 1)) = simp a
+simp (BFunc (Infix Mult) (Z 1) b) = simp b            -- 1 * a = a
+simp (BFunc (Infix Mult) (R 1) b) = simp b
+simp (BFunc (Infix Mult) _ (R 0)) = Z 0                -- a * 0 = 0
+simp (BFunc (Infix Mult) _ (Z 0)) = Z 0
+simp (BFunc (Infix Mult) (R 0) _) = Z 0                -- 0 * a = 0
+simp (BFunc (Infix Mult) (Z 0) _) = Z 0
+simp (BFunc (Infix Mult) (Z z1) (Z z2)) = Z (z1*z2)
+simp (BFunc (Infix Mult) (R r1) (R r2)) = R (r2*r2)
+                                                        -- (a/b) * (c/d) = (a*c) / (b*d)
+simp (BFunc (Infix Mult) (BFunc (Infix Div) a b) (BFunc (Infix Div) c d)) = BFunc (Infix Div) (BFunc (Infix Mult) (simp a) (simp c)) (BFunc (Infix Mult) (simp b) (simp d))
+
+                                                        -- (a/b) / (c/d) = (a*d) / (b*c)
+simp (BFunc (Infix Div) (BFunc (Infix Div) a b) (BFunc (Infix Div) c d)) = BFunc (Infix Div) (BFunc (Infix Mult) (simp a) (simp d)) (BFunc (Infix Mult) (simp b) (simp c))
+simp (BFunc (Infix Div) (Z z1) (Z z2)) | mod z1 z2 == 0 = Z (div z1 z2)
+                                       | otherwise = BFunc (Infix Div) (Z (z1 `div` gcd z1 z2)) (Z (z2 `div` gcd z1 z2))
+simp (BFunc (Infix Div) (R r1) (R r2)) = R (r1 / r2)
 
 
 
 -- Resten av casene, når ingen av reglene gjelder
-simpX (R n) = R n
-simpX (Z n) = Z n
-simpX (Const c) = Const c
-simpX (Var x) = Var x
-simpX (BFunc c a b) = BFunc c (simpC a) (simpC b)
-simpX (UFunc c a) = UFunc c (simpC a)
+simp (R n) = R n
+simp (Z n) = Z n
+simp (Const c) = Const c
+simp (Var x) = Var x
+simp (BFunc c a b) = BFunc c (simp a) (simp b)
+simp (UFunc c a) = UFunc c (simp a)
 
 
 

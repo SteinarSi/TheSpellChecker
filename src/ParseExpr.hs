@@ -45,25 +45,25 @@ Letter       => a | b | c | .... | z | A | B | ... | Z | α | β | ... | ω     
 
 
 
-parseExpr :: (RealFloat n, Show n, TextShow n) => Parser n (Expr n)
+parseExpr :: (RealFloat n) => Parser n (Expr n)
 parseExpr = UFunc USub <$> (char '-' *> parseExpr)
         <|> foldl' (&) <$> parseTerm <*> parseTermList
 
-parseTerm :: (RealFloat n, Show n, TextShow n) => Parser n (Expr n)
+parseTerm :: (RealFloat n) => Parser n (Expr n)
 parseTerm = foldl' (&) <$> parseFactor <*> parseFactorList
 
 -- Lager en liste på formen [ +term, -term, -term, +term ], som kan settes sammen venstreassosiativt med en initiell term.
-parseTermList :: (RealFloat n, Show n, TextShow n) => Parser n [Expr n -> Expr n]
+parseTermList :: (RealFloat n) => Parser n [Expr n -> Expr n]
 parseTermList = fmap ((:) . flip (BFunc (Infix Add)))  (char '+' *> parseTerm) <*> parseTermList
             <|> fmap ((:) . flip (BFunc (Infix BSub))) (char '-' *> parseTerm) <*> parseTermList
             <|> pure []
 
-parseFactor :: (RealFloat n, Show n, TextShow n) => Parser n (Expr n)
+parseFactor :: (RealFloat n) => Parser n (Expr n)
 parseFactor = parseNum >>= \n -> BFunc (Infix Expo) n <$> (char '^' *> parseFactor) <|> pure n
 
 -- Lager en liste på formen [ *faktor, /faktor, *faktor ], som kan settes sammen venstreassosiativt med en initiell faktor
 -- Dette tillater også å droppe gangetegnet i uttrykk, f. eks. 2(3+4) = 2*(3+4).
-parseFactorList :: (RealFloat n, Show n, TextShow n) => Parser n [Expr n -> Expr n]
+parseFactorList :: (RealFloat n) => Parser n [Expr n -> Expr n]
 parseFactorList = fmap ((:) . flip (BFunc (Infix Mult))) ((char '*' *> parseFactor) <|> parseFactor) <*> parseFactorList
               <|> fmap ((:) . flip (BFunc (Infix Div )))  (char '/' *> parseFactor) <*> parseFactorList
               <|> pure []
@@ -78,7 +78,7 @@ parseVar = do
 parseParam :: Parser n String
 parseParam = many1 letter
 
-parseNum :: (RealFloat n, Show n, TextShow n) => Parser n (Expr n)
+parseNum :: (RealFloat n) => Parser n (Expr n)
 parseNum = try (R <$> parseFloat)
        <|> try (Z <$> parseInteger)
        <|> try (char '(' *> parseExpr <* char ')')
@@ -87,7 +87,7 @@ parseNum = try (R <$> parseFloat)
        <|> try (string "pi" <|> string "Pi" <|> string "π") $> Const Pi
        <|> parseFunctionCall
 
-parseFunctionCall :: (RealFloat n, Show n, TextShow n) => Parser n (Expr n)
+parseFunctionCall :: (RealFloat n) => Parser n (Expr n)
 parseFunctionCall = try (BFunc (Prefix Log) (Const E) <$> ((string "log" <|> string "Log" <|> string "ln" <|> string "Ln") *> char '(' *> parseExpr <* char ')')) --log med e som base
        <|> try (BFunc (Prefix Log) <$> ((string "log" <|> string "Log") *> (char '[' *> parseExpr <* char ']' <|> fmap Z parseInteger)) <*> (char '(' *> parseExpr <* char ')')) -- log med custom base
        <|> try (do

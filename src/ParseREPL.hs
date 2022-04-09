@@ -30,7 +30,7 @@ data Command n = NewFunction (Function n)
                | Quit
                | Help
 
-parseCommand :: (RealFloat n, Show n, TextShow n) => Parser n (Command n)
+parseCommand :: (RealFloat n) => Parser n (Command n)
 parseCommand = try (Help <$ (string "help" <|> string "Help" <|> string "h") <* eof)   
            <|> try (Quit <$ (string "quit" <|> string "q" <|> string "Quit") <* eof)
            <|> try (ShowFunction <$> parseFunctionName <* eof)
@@ -38,13 +38,13 @@ parseCommand = try (Help <$ (string "help" <|> string "Help" <|> string "h") <* 
            <|> try (NewFunction <$> (Function <$> parseName <*> (char '(' *> parseParams <* char ')' <* char '=') <*> parseExpr <* eof))
            
 
-parseConstant :: (RealFloat n, Show n, TextShow n) => Parser n (Expr n)
+parseConstant :: (RealFloat n) => Parser n (Expr n)
 parseConstant = do
     e <- parseExpr 
     if isConstant e then pure e 
     else fail "Function argument has to be a constant expression"
 
-parseFunctionName :: (RealFloat n, TextShow n, Show n) => Parser n (Function n)
+parseFunctionName :: (RealFloat n) => Parser n (Function n)
 parseFunctionName = do
     name <- T.pack <$> many1 letter
     d <- length <$> many (char '\'')
@@ -59,11 +59,11 @@ parseFunctionName = do
 parseName :: Parser n Text
 parseName = T.pack <$> many letter
 
-parseArgs :: (RealFloat n, Show n, TextShow n) => [Parameter] -> Parser n [Argument n]
+parseArgs :: (RealFloat n) => [Parameter] -> Parser n [Argument n]
 parseArgs [] = pure []
 parseArgs (p:ps) = (:) . (,) p <$> fmap evalConstant parseConstant <*> tryWhatever (char ',') (parseArgs ps)
 
-parseParams :: (RealFloat n, Show n, TextShow n) => Parser n [Parameter]
+parseParams :: (RealFloat n) => Parser n [Parameter]
 parseParams = (do
         p <- T.pack <$> many1 letter
         (_, ps) <- lift get

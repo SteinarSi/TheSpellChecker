@@ -117,28 +117,28 @@ bFuncFromConstr :: RealFloat n => BinaryFunction -> (BinaryFunction, Text, n -> 
 bFuncFromConstr c = head [ f | f@(con, name, func) <- bFunctions, con == c ]
 
 
-instance (RealFloat n, TextShow n) => Show (Function n) where
+instance (Floating n, TextShow n) => Show (Function n) where
     show (Function name params expr) = unpack name <> "(" <> intercalate "," (map unpack params) <> ") = " <> toString (showb expr)
 
 instance Eq (Function n) where
     (Function name1 _ _) == (Function name2 _ _) = name1 == name2
 
 
-instance (RealFloat n, TextShow n) => TextShow (Expr n) where
+instance (Floating n, TextShow n) => TextShow (Expr n) where
     showbPrec p (Const c)   = let (_, name, _) = constantFromConstr c in fromText name
     showbPrec p (Z n)     = showb n
     showbPrec p (R  a)    = showb a
     showbPrec p (Var v)     = fromText v
     showbPrec p (UFunc USub a) = showbParen (5 < p) ("-" <> showbPrec 5 a)
     showbPrec p (UFunc c a) = let (_, name, _) = uFuncFromConstr c in fromText name <> "(" <> showb a <> ")"
-    showbPrec p (BFunc (Prefix Log) a b) | a == Const E = "ln(" <> showb b <> ")"
-                                         | otherwise = "log[" <> showb a <> "](" <> showb b <> ")"
+    showbPrec p (BFunc (Prefix Log) (Const E) b) = "ln(" <> showb b <> ")"
+    showbPrec p (BFunc (Prefix Log) a b) = "log[" <> showb a <> "](" <> showb b <> ")"
     showbPrec p (BFunc (Prefix c) a b) = let (_, name, _) = bFuncFromConstr (Prefix c) in fromText name <> "(" <> showb a <> ", " <> showb b <> ")"
     showbPrec p (BFunc (Infix c) a b) = let (_, op, _) = bFuncFromConstr (Infix c) 
                                             opPrec = infixPrecedence c
                                         in  showbParen (opPrec < p) (showbPrec opPrec a <> fromText op <> showbPrec opPrec b)
 
-instance (TextShow n, RealFloat n, Show n) => Show (Expr n) where
+instance (TextShow n, Floating n) => Show (Expr n) where
     show = toString . showb
 
 instance Num n => Num (Expr n) where
