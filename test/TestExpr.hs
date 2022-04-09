@@ -10,7 +10,6 @@ import Data.Number.CReal
 
 import Expr
 import ParseExpr
-import GHC.Read (paren)
 
 
 testExpr :: Test 

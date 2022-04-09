@@ -48,6 +48,10 @@ instance Floating RealCyclotomic where
     exp   = cheat exp
     log   = cheat log
 
+-- En klasse av ting som har en alternativ show-funksjon, for debugging.
+class Debug a where
+    debug :: a -> String
+
 
 -- Dette er ren juks. Jeg kan ta alle Floating-operasjoner på cyclotomiske tall bare ved
 --  å eksportere tallene ineksakt frem og tilbake. Dette gjør at mange av operasjonene

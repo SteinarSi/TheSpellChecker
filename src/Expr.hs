@@ -6,7 +6,7 @@
 
 module Expr (Expr(..), Argument, Parameter, Constant(..), Function(Function), UnaryFunction(..), BinaryFunction(..), 
     PrefixFunction(..), InfixFunction(..), bFunctions, uFunctions, bFuncFromName, uFuncFromName, bFuncFromConstr, uFuncFromConstr, isConstant, evalConstant,
-     evalFunction, betaReduce, uFuncNames, bFuncNames) where
+     evalFunction, betaReduce, uFuncNames, bFuncNames, debug) where
 
 import Data.Number.RealCyclotomic (RealCyclotomic, toReal, toRat)
 import Data.Text (Text, unpack, pack, toLower)
@@ -14,7 +14,7 @@ import Data.List (intercalate)
 import TextShow (TextShow(..), showbParen, showb, fromText, toText, toString)
 import Data.Maybe (listToMaybe)
 
-import Utility (realToRat)
+import Utility (realToRat, Debug(debug))
 
 
 data Expr n = UFunc UnaryFunction (Expr n)
@@ -170,7 +170,28 @@ instance Floating n => Floating (Expr n) where
     acosh = UFunc Acosh
     atanh = UFunc Atanh
 
-    
+instance Debug UnaryFunction where
+    debug = show
+
+instance Debug InfixFunction where
+    debug = show
+
+instance Debug PrefixFunction where
+    debug = show
+
+instance Show n => Debug (Expr n) where
+    debug (Const c) = show c
+    debug (Z z) = show z
+    debug (R r) = show r
+    debug (UFunc c e) = "(" <> debug c <> " " <> debug e <> ")"
+    debug (UFunc c e) = "(" <> debug c <> " " <> debug e <> ")"
+    debug (BFunc (Infix c) a b) = let (_, n, _) = bFuncFromConstr (Infix c) 
+                                  in "(" <> debug a <> " " <> unpack n <> " " <> debug b <>")"
+    debug (BFunc (Prefix c) a b) = "(" <> debug c <> " " <> debug a <> " " <> debug b <> ")"
+    debug (Var x) = "(Var " <> unpack x <> ")"
+
+instance Show n => Debug (Function n) where
+    debug (Function name params expr) = unpack name <> "(" <> intercalate "," (map unpack params) <> ") = " <> debug expr
 
 -- erstatter alle variabler med sin nye verdi.
 betaReduce :: Expr n -> [(Text, Expr n)] -> Expr n

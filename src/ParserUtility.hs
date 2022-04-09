@@ -37,6 +37,15 @@ parseRealFloat = do
         Left err     -> fail err
         Right (n, _) -> pure (realToRat n)
 
+parseFloat :: RealFloat n => Parser n n
+parseFloat = do
+    before <- withDefault (T.pack <$> many digit) "0"
+    comma  <- string "."
+    after  <- withDefault (T.pack <$> many digit) "0"
+    case double (before <> comma <> after) of
+        Left err     -> fail err
+        Right (n, _) -> pure (realToRat n)
+
 parseInteger :: Parser n Integer
 parseInteger = read <$> many1 digit
 

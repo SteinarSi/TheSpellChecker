@@ -76,7 +76,7 @@ diff (BFunc (Infix Expo) f g) x = BFunc (Infix Mult)
             (BFunc (Infix Div) <$> (BFunc (Infix Mult) <$> diff f x <*> Right g) <*> Right f) <*> 
             (BFunc (Infix Mult) <$> diff g x <*> Right (BFunc (Prefix Log) (Const E) f)))
 
--- (ln(g))' = (ln(g))' / g
+-- (ln(g))' = (ln(g')) / g
 diff (BFunc (Prefix Log) f g) x | f == Const E = BFunc (Infix Div) <$> diff g x <*> Right g
 
                             -- logf(g)' = (g'*ln(f)/g - ln(g)*f'/f) / (ln(f))^2

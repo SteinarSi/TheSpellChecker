@@ -79,7 +79,7 @@ parseParam :: Parser n String
 parseParam = many1 letter
 
 parseNum :: (RealFloat n, Show n, TextShow n) => Parser n (Expr n)
-parseNum = try (R <$> parseRealFloat)
+parseNum = try (R <$> parseFloat)
        <|> try (Z <$> parseInteger)
        <|> try (char '(' *> parseExpr <* char ')')
        <|> try parseVar
