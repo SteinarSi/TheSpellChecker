@@ -29,5 +29,5 @@ loop fs = do
                 putStrLn ("I parsed the function like this: " ++ show f)
                 putStrLn ("And it was simplified to this: " ++ show (simplify ex))
                 loop (Function name params (simplify ex) : delete f fs)
-            Eval ex -> putStrLn (toString (showb ex <> " = " <> showb (evalConstant ex))) >> loop fs
+            Eval ex -> putStrLn (either T.unpack (\r -> toString (showb ex <> " = " <> showb r)) (eval ex)) >> loop fs
             ShowFunction f -> print f >> loop fs

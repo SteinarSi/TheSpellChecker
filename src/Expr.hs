@@ -6,7 +6,7 @@
 
 module Expr (Expr(..), Argument, Parameter, Constant(..), Function(Function), UnaryFunction(..), BinaryFunction(..),
     PrefixFunction(..), InfixFunction(..), bFunctions, uFunctions, bFuncFromName, uFuncFromName, bFuncFromConstr, uFuncFromConstr, isConstant,
-     evalFunction, betaReduce, uFuncNames, bFuncNames, debug, evalConstant) where
+        betaReduce, uFuncNames, bFuncNames, debug, eval) where
 
 import Data.Number.RealCyclotomic (RealCyclotomic, toReal, toRat)
 import Data.Text (Text, unpack, pack, toLower)
@@ -14,8 +14,6 @@ import qualified Data.Text as T
 import Data.List (intercalate, foldr1, intersperse)
 import TextShow (TextShow(..), showbParen, showb, fromText, toText, toString)
 import Data.Maybe (listToMaybe)
-
-import Debug.Trace
 
 import Utility (realToRat, Debug(debug))
 
@@ -226,15 +224,11 @@ isConstant (FFunc (Function _ params expr) args) = isConstant (betaReduce expr (
 
 
 -- Kræsjer om uttrykket ikke er en konstant.
-evalConstant :: (Show n, RealFloat n) => Expr n -> n
-evalConstant (Var x)       = error ("Unexpected variable in 'constant': " <> unpack x)
-evalConstant (Z z)         = fromInteger z
-evalConstant (R r)         = r
-evalConstant (Const c)     = let (_, _, n) = constantFromConstr c in n
-evalConstant (UFunc c a)   = let (_, _, f) = uFuncFromConstr c in f (evalConstant a)
-evalConstant (BFunc c a b) = let (_, _, f) = bFuncFromConstr c in f (evalConstant a) (evalConstant b)
-evalConstant (FFunc f@(Function name params expr) args) = evalConstant (betaReduce expr (zip params args))
-
-evalFunction :: (Show n, RealFloat n) => Function n -> [Argument n] -> Either Text n
-evalFunction (Function _ params ex) args | length params == length args = Right $ evalConstant (betaReduce ex (zip params args))
-                                         | otherwise = Left (pack ("Wrong number of arguments; expected " <> show (length params) <> ", but got " <> show (length args)))
+eval :: (Show n, RealFloat n) => Expr n -> Either Text n
+eval (Var x)       = Left ("Unexpected variable in 'constant': " <> x)
+eval (Z z)         = Right (fromInteger z)
+eval (R r)         = Right r
+eval (Const c)     = let (_, _, n) = constantFromConstr c in Right n
+eval (UFunc c a)   = let (_, _, f) = uFuncFromConstr c in f <$> eval a
+eval (BFunc c a b) = let (_, _, f) = bFuncFromConstr c in f <$> eval a <*> eval b
+eval (FFunc f@(Function name params expr) args) = eval (betaReduce expr (zip params args))

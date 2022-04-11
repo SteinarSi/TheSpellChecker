@@ -87,6 +87,7 @@ diff (BFunc (Prefix Log) f g) x | f == Const E = BFunc (Infix Div) <$> diff g x 
                                         (BFunc (Infix Div) <$> (BFunc (Infix Mult) <$> diff g x <*> Right (BFunc (Prefix Log) (Const E) f)) <*> Right g) <*> 
                                         (BFunc (Infix Div) <$> (BFunc (Infix Mult) (BFunc (Prefix Log) (Const E) g) <$> diff f x) <*> Right f)) <*> 
                                     Right (BFunc (Infix Expo) (BFunc (Prefix Log) (Const E) f) (Z 2))
+diff (FFunc (Function _ params expr) args) x = diff (betaReduce expr (zip params args)) x
 
 diff (BFunc (Prefix c) _ _) _ = let (_, name, _) = bFuncFromConstr (Prefix c) in Left ("The function " <> name <> "() has no defined derivative (yet)")
 diff (BFunc (Infix c)  _ _) _ = let (_, name, _) = bFuncFromConstr (Infix  c) in Left ("The operator " <> name <> " has no defined derivative (yet)")
