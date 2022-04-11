@@ -2,13 +2,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 
-module Calculus (differentiate, simplify, simplifyFunction) where
+module Calculus where
 
 
 import Data.Text (Text)
 import TextShow (TextShow)
+import Data.List (sort)
 
-
+import Debug.Trace
 
 
 import Expr
@@ -105,39 +106,52 @@ simp :: (RealFloat n) => Expr n -> Expr n
 simp (R r) | r == fromInteger (round r) = Z (round r)      -- a.0 = a
 
 simp (BFunc (Infix Add) a (Z 0)) = simp a                 -- a + 0 = a
-simp (BFunc (Infix Add) a (R 0)) = simp a
-simp (BFunc (Infix Add) (R 0) b) = simp b                 -- 0 + a = a
-simp (BFunc (Infix Add) (Z 0) b) = simp b
+simp (BFunc (Infix Add) (Z 0) b) = simp b                 -- 0 + a = a
+simp (BFunc (Infix Add) (Z z) (R r)) = R (r + fromInteger z)
+simp (BFunc (Infix Add) (R r) (Z z)) = R (r + fromInteger z)
 simp (BFunc (Infix Add) a (UFunc USub b)) = simp (BFunc (Infix BSub) a b)     -- a + (-b) = a - b
 simp (BFunc (Infix Add) (UFunc USub b) a) = simp (BFunc (Infix BSub) a b)     -- (-b) + a = a - b
+simp (BFunc (Infix Add) a b) | a == b = 2 * a
 
 simp (BFunc (Infix Add) (Z z1) (Z z2)) = Z (z1+z2)
 simp (BFunc (Infix Add) (R r1) (R r2)) = R (r1+r2)
 
-simp (UFunc USub (UFunc USub a)) = simp a             -- -(-a) = a
-simp (BFunc (Infix BSub) (Z 0) b) = UFunc USub (simp b)
-simp (BFunc (Infix BSub) (R 0) b) = UFunc USub (simp b)
-simp (BFunc (Infix BSub) b (Z 0)) = simp b
-simp (BFunc (Infix BSub) b (R 0)) = simp b
+simp (UFunc USub (UFunc USub a)) = simp a               -- -(-a) = a
+simp (BFunc (Infix BSub) (Z 0) b) = UFunc USub (simp b) -- 0 - b = -b
+simp (BFunc (Infix BSub) b (Z 0)) = simp b              -- b-0 = b
+simp (BFunc (Infix BSub) (Z z1) (Z z2)) = Z (z1-z2)
+simp (BFunc (Infix BSub) (R r1) (R r2)) = R (r1-r2)
 
-simp (BFunc (Infix Mult) a (Z 1)) = simp a            -- a * 1 = a
-simp (BFunc (Infix Mult) a (R 1)) = simp a
-simp (BFunc (Infix Mult) (Z 1) b) = simp b            -- 1 * a = a
-simp (BFunc (Infix Mult) (R 1) b) = simp b
-simp (BFunc (Infix Mult) _ (R 0)) = Z 0                -- a * 0 = 0
-simp (BFunc (Infix Mult) _ (Z 0)) = Z 0
-simp (BFunc (Infix Mult) (R 0) _) = Z 0                -- 0 * a = 0
-simp (BFunc (Infix Mult) (Z 0) _) = Z 0
+
+simp (BFunc (Infix Mult) a (Z 1)) = simp a              -- a * 1 = a
+simp (BFunc (Infix Mult) (Z 1) b) = simp b              -- 1 * a = a
+simp (BFunc (Infix Mult) _ (Z 0)) = Z 0                 -- a * 0 = 0
+simp (BFunc (Infix Mult) (Z 0) _) = Z 0                 -- 0 * a = 0
 simp (BFunc (Infix Mult) (Z z1) (Z z2)) = Z (z1*z2)
 simp (BFunc (Infix Mult) (R r1) (R r2)) = R (r2*r2)
                                                         -- (a/b) * (c/d) = (a*c) / (b*d)
-simp (BFunc (Infix Mult) (BFunc (Infix Div) a b) (BFunc (Infix Div) c d)) = BFunc (Infix Div) (BFunc (Infix Mult) (simp a) (simp c)) (BFunc (Infix Mult) (simp b) (simp d))
+simp (BFunc (Infix Mult) (BFunc (Infix Div) a b) (BFunc (Infix Div) c d)) = (a*c) / (b*d)
+simp (BFunc (Infix Mult) a b) | a == b = a ** 2
+simp (BFunc (Infix Mult) (BFunc (Infix Expo) a b) c) | a == c = a ** (b+1)
+simp (BFunc (Infix Mult) a (BFunc (Infix Expo) b c)) | a == b = a ** (c+1)
+simp (BFunc (Infix Mult) (BFunc (Infix Expo) a b) (BFunc (Infix Expo) c d)) | a == c = a ** (b+d)
 
                                                         -- (a/b) / (c/d) = (a*d) / (b*c)
-simp (BFunc (Infix Div) (BFunc (Infix Div) a b) (BFunc (Infix Div) c d)) = BFunc (Infix Div) (BFunc (Infix Mult) (simp a) (simp d)) (BFunc (Infix Mult) (simp b) (simp c))
+simp (BFunc (Infix Div) (BFunc (Infix Div) a b) (BFunc (Infix Div) c d)) = (a*d) / (b*c)
 simp (BFunc (Infix Div) (Z z1) (Z z2)) | mod z1 z2 == 0 = Z (div z1 z2)
-                                       | otherwise = BFunc (Infix Div) (Z (z1 `div` gcd z1 z2)) (Z (z2 `div` gcd z1 z2))
+                                       | otherwise = Z (z1 `div` gcd z1 z2) / Z (z2 `div` gcd z1 z2)
 simp (BFunc (Infix Div) (R r1) (R r2)) = R (r1 / r2)
+simp (BFunc (Infix Div) (Z 0) _) = Z 0
+simp (BFunc (Infix Div) a (Z 1)) = a                    -- a/1 = a
+
+simp (BFunc (Infix Div) a b) | a == b = Z 1             -- a/a = 1
+simp (BFunc (Infix Div) (BFunc (Infix Expo) a b) c) | a == c = a**(b-1)
+simp (BFunc (Infix Div) a (BFunc (Infix Expo) b c)) | a == b = 1 / (b**(c-1))
+simp (BFunc (Infix Div) (BFunc (Infix Expo) a b) (BFunc (Infix Expo) c d)) | a == c = a**(b-d)
+
+simp (BFunc (Infix Expo) a 0) = 1
+simp (BFunc (Infix Expo) a 1) = a
+
 
 
 
@@ -151,5 +165,25 @@ simp (BFunc c a b) = BFunc c (simp a) (simp b)
 simp (UFunc c a) = UFunc c (simp a)
 simp (FFunc (Function name params expr) args) = FFunc (Function name params (simp expr)) (map simp args)
 
+
+multList :: Expr n -> ([Expr n], [Expr n])
+multList (BFunc (Infix Mult) a b) = let (ms1, ds1) = multList a
+                                        (ms2, ds2) = multList b
+                                    in  (ms1++ms2, ds1++ds2)
+multList (BFunc (Infix Div) a b)  = let (ms1, ds1) = multList a
+                                        (ms2, ds2) = multList b
+                                    in  (ms1++ds2, ds1++ms2)
+multList a = ([a], [])
+
+listMult :: Eq n => ([Expr n], [Expr n]) -> Expr n
+listMult (a, []) = foldl1 (BFunc (Infix Mult)) $ sort a
+listMult (a, b)  = BFunc (Infix Div) (foldl1 (BFunc (Infix Mult)) (sort a)) (foldl1 (BFunc (Infix Mult)) (sort b))
+
+addList :: Expr n -> [Expr n]
+addList (BFunc (Infix Add) a b) = addList a ++ addList b
+addList a = [a]
+
+listAdd :: Eq n => [Expr n] -> Expr n
+listAdd = foldl1 (BFunc (Infix Add)) . sort
 
 

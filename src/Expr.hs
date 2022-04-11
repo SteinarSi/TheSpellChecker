@@ -161,6 +161,7 @@ instance Fractional n => Fractional (Expr n) where
 
 instance Floating n => Floating (Expr n) where
     pi = R pi
+    (**) a b = BFunc (Infix Expo) a b
     exp = BFunc (Infix Expo) (Const E)
     log = BFunc (Infix Expo) (Const E)
     sin   = UFunc Sin
@@ -168,13 +169,40 @@ instance Floating n => Floating (Expr n) where
     tan   = UFunc Tan
     asin  = UFunc Asin
     acos  = UFunc Acos
-    atan  = UFunc Atan
+    atan  = UFunc Atan  
     sinh  = UFunc Sinh
     cosh  = UFunc Cosh
     tanh  = UFunc Tanh
     asinh = UFunc Asinh
     acosh = UFunc Acosh
     atanh = UFunc Atanh
+
+instance Eq n => Ord (Expr n) where
+    (<=) (Z _) _ = True
+    (<=) (R _) (Z _) = False
+    (<=) (R _) _ = True
+    (<=) (Const _) (Z _) = False
+    (<=) (Const _) (R _) = False
+    (<=) (Const _) _ = True
+    (<=) (BoundedVar _) (Z _) = False
+    (<=) (BoundedVar _) (R _) = False
+    (<=) (BoundedVar _) (Const _) = False
+    (<=) (BoundedVar _) _ = True
+    (<=) (FreeVar _ _) (Z _) = False
+    (<=) (FreeVar _ _) (R _) = False
+    (<=) (FreeVar _ _) (Const _) = False
+    (<=) (FreeVar _ _) (BoundedVar _) = False
+    (<=) (FreeVar _ _) _ = True
+
+    (<=) (UFunc _ _) (UFunc _ _) = True
+    (<=) (UFunc _ _) (BFunc _ _ _) = True
+    (<=) (UFunc _ _) (FFunc _ _) = True
+    (<=) (UFunc _ _) _ = False
+    (<=) (BFunc _ _ _) (BFunc _ _ _) = True
+    (<=) (BFunc _ _ _) (FFunc _ _) = True
+    (<=) (BFunc _ _ _) _ = False
+    (<=) (FFunc _ _) (FFunc _ _) = True
+    (<=) (FFunc _ _) _ = False
 
 instance Debug UnaryFunction where
     debug = show
@@ -237,10 +265,15 @@ eval (R r)          = Right r
 eval (Const c)      = let (_, _, n) = constantFromConstr c in Right n
 eval (UFunc c a)    = let (_, _, f) = uFuncFromConstr c in f <$> eval a
 eval (BFunc (Prefix Log) a b) = case (eval a, eval b) of
-    (Right x, Right y) | x <= 0 -> Left (pack ("The base of a logarithm must be strictly positive, but was: " <> show x))
-                       | y <= 0 -> Left (pack ("The argument to a log has to be strictly positive, but was: " <> show y))
+    (Right x, Right y) | x <= 0 -> Left (pack ("Error: The base of a logarithm must be strictly positive, but was: " <> show x))
+                       | y <= 0 -> Left (pack ("Error: The argument to a log has to be strictly positive, but was: " <> show y))
                        | otherwise -> let (_, _, f) = bFuncFromConstr (Prefix Log) in Right (f x y)
     (Left err, _) -> Left err
     (_, Left err) -> Left err
+eval (BFunc (Infix Div) a b) = let (_, _, f) = bFuncFromConstr (Infix Div)
+                               in  case eval b of
+                                   Left er -> Left er
+                                   Right 0 -> Left "Error: Cannot divide by zero."
+                                   Right d -> (`f` d) <$> eval a
 eval (BFunc c a b)  = let (_, _, f) = bFuncFromConstr c in f <$> eval a <*> eval b
 eval (FFunc f@(Function name params expr) args) = eval (betaReduce expr (zip params args))

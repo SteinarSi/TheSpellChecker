@@ -58,7 +58,3 @@ class Debug a where
 --  ikke blir helt nøyaktige, men det er fortsatt bedre enn å bare bruke Floats.
 cheat :: (RealFloat b, Real a, Fractional c) => (b -> a) -> RealCyclotomic -> c
 cheat f = realToRat . f . toReal
-
-
-
-

@@ -6,11 +6,10 @@ import qualified Data.Text as T
 
 
 import Data.Either (either)
-import Data.Number.CReal
 import TextShow (showb, toString)
 import Data.List (delete)
 
-import Expr
+import Expr ( Function(Function), eval )
 import ParseExpr ( parse )
 import ParseREPL( parseCommand,Command(..) )
 import ParserUtility (UserData(..))
