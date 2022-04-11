@@ -13,21 +13,21 @@ import Data.List (delete)
 import Expr
 import ParseExpr ( parse )
 import ParseREPL( parseCommand,Command(..) )
-import Calculus (simplify)
+import ParserUtility (UserData(..))
+import Calculus (simplify, simplifyFunction)
 
 
 
-loop :: [Function Double] -> IO ()
+loop :: [UserData Double] -> IO ()
 loop fs = do
     inn <- getLine
-    case parse parseCommand fs (T.pack inn) of 
+    case parseCommand fs (T.pack inn) of 
         Left err -> print err >> loop fs
         Right ex -> case ex of
             Help -> readFile "data/help.txt" >>= putStrLn >> loop fs
             Quit -> putStrLn "Bye-bye!"
-            NewFunction f@(Function name params ex) -> do
-                putStrLn ("I parsed the function like this: " ++ show f)
-                putStrLn ("And it was simplified to this: " ++ show (simplify ex))
-                loop (Function name params (simplify ex) : delete f fs)
+            NoAction -> loop fs
+            NewFunction f@(Function name params ex) -> let uf = UserFunction (simplifyFunction f) in loop (uf : delete uf fs)
+            NewVariable name ex -> loop (UserVariable name (simplify ex) : fs)
             Eval ex -> putStrLn (either T.unpack (\r -> toString (showb ex <> " = " <> showb r)) (eval ex)) >> loop fs
             ShowFunction f -> print f >> loop fs

@@ -12,7 +12,7 @@ import TextShow (TextShow)
 import Text.Read (readMaybe)
 import Data.Functor (($>))
 import Data.Function ((&))
-import Data.List (foldl')
+import Data.List (foldl', find)
 import Data.Number.RealCyclotomic (RealCyclotomic)
 
 import Control.Monad (replicateM)
@@ -71,9 +71,14 @@ parseFactorList = fmap ((:) . flip (BFunc (Infix Mult))) ((char '*' *> parseFact
 parseVar :: Parser n (Expr n)
 parseVar = do
     var <- T.pack <$> many1 letter
-    (_, ps) <- lift get -- look at me, I understand monad transformers now!
-    if var `elem` ps then pure (Var var)
-    else failT ("Unrecognized variable name: " <> var)
+    (dt, ps) <- lift get -- look at me, I understand monad transformers now!
+    if var `elem` ps then pure (BoundedVar var)
+    else case find (==UserVariable var (Z 0)) dt of
+         Nothing -> failT ("Unrecognized variable name: " <> var)
+         Just (UserVariable v ex) -> pure (FreeVar v ex)
+         Just _ -> error "bruh"
+    
+    --maybe (failT ("Unrecognized variable name: " <> var)) (\(UserVariable n ex) -> FreeVar n ex) (find (==UserVariable var (Z 0)) dt)
 
 parseParam :: Parser n String
 parseParam = many1 letter
@@ -101,11 +106,7 @@ parseFunctionCall = try (BFunc (Prefix Log) (Const E) <$> ((string "log" <|> str
        <|> (do
             name <- T.pack <$> many1 letter
             (fs, _) <- lift get
-            case [ f | f@(Function fname _ _)<-fs, name == fname ] of
+            case [ f | UserFunction f@(Function fname _ _)<-fs, name == fname ] of
                 [] -> failT ("Unrecognized function: " <> name)
-                (f@(Function fname params ex):_) -> do
-                    char '('
-                    args <- replicateM (length params) (tryWhatever (char ',') parseExpr)
-                    char ')'
-                    pure (FFunc f args)
+                (f@(Function fname params ex):_) -> FFunc f <$> (char '(' *> replicateM (length params) (tryWhatever (char ',') parseExpr) <* char ')')
        )

@@ -1,5 +1,7 @@
 
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use infix" #-}
 
 
 module ParseREPL where
@@ -15,32 +17,38 @@ import Control.Monad.Trans (lift)
 import Data.Maybe (listToMaybe, maybe)
 
 import Expr
-import ParserUtility ( failT, letter, many1, tryWhatever, Parser )
+import ParserUtility ( parse, failT, letter, many1, tryWhatever, Parser, ParseError, UserData(..))
 import ParseExpr ( parseExpr )
 import Calculus (differentiate)
 import Utility (applyNtimesM)
 
 
-
 data Command n = NewFunction (Function n)
+               | NewVariable Text (Expr n)
                | ShowFunction (Function n)
                | Eval (Expr n)
+               | NoAction
                | Quit
                | Help
 
-parseCommand :: (RealFloat n) => Parser n (Command n)
-parseCommand = try (Help <$ (string "help" <|> string "Help" <|> string "h") <* eof)   
-           <|> try (Quit <$ (string "quit" <|> string "q" <|> string "Quit") <* eof)
-           <|> try (ShowFunction <$> parseFunctionName <* eof)
-           <|> try (Eval <$> parseExpr <* eof)
-           <|> try (NewFunction <$> (Function <$> parseName <*> (char '(' *> parseParams <* char ')' <* char '=') <*> parseExpr <* eof))
+parseCommand :: RealFloat n => [UserData n] -> Text -> Either ParseError (Command n)
+parseCommand = parse parseCommand'
+    where 
+        parseCommand' :: (RealFloat n) => Parser n (Command n)
+        parseCommand' = try (Help <$ (string "help" <|> string "Help" <|> string "h") <* eof)   
+                <|> try (Quit <$ (string "quit" <|> string "q" <|> string "Quit") <* eof)
+                <|> try (ShowFunction <$> parseFunctionName <* eof)
+                <|> try (Eval <$> parseExpr <* eof)
+                <|> try (NewFunction <$> (Function <$> parseName <*> (char '(' *> parseParams <* char ')' <* char '=') <*> parseExpr <* eof))
+                <|> try (NewVariable . T.pack <$> many1 letter <*> (many (char ' ') *> char '=' *> parseExpr ))
+                <|> NoAction <$ eof
 
 parseFunctionName :: (RealFloat n) => Parser n (Function n)
 parseFunctionName = do
     name <- T.pack <$> many1 letter
     d <- length <$> many (char '\'')
     (fs, _) <- lift get
-    case listToMaybe [ f | f@(Function fname params ex) <- fs, fname == name ] of
+    case listToMaybe [ f | UserFunction f@(Function fname params ex) <- fs, fname == name ] of
         Nothing -> fail "No such function has been defined"
         Just f@(Function fname [] ex) -> pure f
         Just f@(Function fname (p:ps) ex) -> case applyNtimesM d (`differentiate` p) ex of

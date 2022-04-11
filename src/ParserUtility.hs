@@ -21,12 +21,19 @@ import Utility
 
 
 
-type Parser n = ParsecT Void Text (State ([Function n], [Text]))
+type Parser n = ParsecT Void Text (State ([UserData n], [Text]))
 type ParseError = ParseErrorBundle Text Void
+data UserData n = UserFunction (Function n)
+                | UserVariable Text (Expr n)
+
+instance Eq (UserData n) where
+    (==) (UserFunction (Function name1 _ _)) (UserFunction (Function name2 _ _)) = name1 == name2
+    (==) (UserVariable name1 _) (UserVariable name2 _) = name1 == name2
+    (==) _ _ = False
 
 
-parse :: Parser n a -> [Function n] -> Text -> Either ParseError a
-parse prsr fs text = evalState (runParserT prsr "User input" (T.filter (/=' ') text)) (fs, [])
+parse :: Parser n a -> [UserData n] -> Text -> Either ParseError a
+parse prsr dt text = evalState (runParserT prsr "User input" (T.filter (/=' ') text)) (dt, [])
 
 parseRealFloat :: RealFloat n => Parser n n
 parseRealFloat = do

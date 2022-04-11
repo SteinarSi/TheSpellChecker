@@ -23,7 +23,8 @@ data Expr n = UFunc UnaryFunction (Expr n)
             | FFunc (Function n) [Expr n]
             | Z Integer
             | R n
-            | Var Text
+            | BoundedVar Text
+            | FreeVar Text (Expr n)
             | Const Constant
     deriving Eq
 
@@ -132,7 +133,8 @@ instance (Floating n, TextShow n) => TextShow (Expr n) where
     showbPrec p (Const c)   = let (_, name, _) = constantFromConstr c in fromText name
     showbPrec p (Z n)     = showb n
     showbPrec p (R  a)    = showb a
-    showbPrec p (Var v)     = fromText v
+    showbPrec p (BoundedVar v)     = fromText v
+    showbPrec p (FreeVar n _) = fromText n
     showbPrec p (UFunc USub a) = showbParen (5 < p) ("-" <> showbPrec 5 a)
     showbPrec p (UFunc c a) = let (_, name, _) = uFuncFromConstr c in fromText name <> "(" <> showb a <> ")"
     showbPrec p (BFunc (Prefix Log) (Const E) b) = "ln(" <> showb b <> ")"
@@ -193,7 +195,8 @@ instance Show n => Debug (Expr n) where
     debug (BFunc (Infix c) a b) = let (_, n, _) = bFuncFromConstr (Infix c)
                                   in "(" <> debug a <> " " <> unpack n <> " " <> debug b <>")"
     debug (BFunc (Prefix c) a b) = "(" <> debug c <> " " <> debug a <> " " <> debug b <> ")"
-    debug (Var x) = "(Var " <> unpack x <> ")"
+    debug (BoundedVar x) = "(Var " <> unpack x <> ")"
+    debug (FreeVar v ex) = "(Var " <> unpack v <> "=" <> debug ex <> ")"
 
 instance Show n => Debug (Function n) where
     debug (Function name params expr) = unpack name <> "(" <> intercalate "," (map unpack params) <> ") = " <> debug expr
@@ -206,7 +209,8 @@ betaReduce = betaReduce' []
         betaReduce' bounded (Const c)      _    = Const c
         betaReduce' bounded (Z z)          _    = Z z
         betaReduce' bounded (R r)          _    = R r
-        betaReduce' bounded (Var v)        args | v `elem` bounded = Var v
+        betaReduce' bounded (FreeVar v ex) args = FreeVar v ex
+        betaReduce' bounded (BoundedVar v) args | v `elem` bounded = BoundedVar v
                                                 | otherwise = head [ value | (name, value) <- args, v == name ]
         betaReduce' bounded (UFunc c a)    args = UFunc c (betaReduce' bounded a args)
         betaReduce' bounded (BFunc c a b)  args = BFunc c (betaReduce' bounded a args) (betaReduce' bounded b args)
@@ -214,21 +218,29 @@ betaReduce = betaReduce' []
             FFunc (Function name params (betaReduce' (params ++ bounded) expr args)) (map (\a -> betaReduce' bounded a args) funcargs)
 
 isConstant :: Expr n -> Bool
-isConstant (Var _)       = False
-isConstant (Z _)         = True
-isConstant (R _)         = True
-isConstant (Const _)     = True
-isConstant (UFunc _ a)   = isConstant a
-isConstant (BFunc _ a b) = isConstant a && isConstant b
+isConstant (BoundedVar _) = False
+isConstant (FreeVar v ex) = True
+isConstant (Z _)          = True
+isConstant (R _)          = True
+isConstant (Const _)      = True
+isConstant (UFunc _ a)    = isConstant a
+isConstant (BFunc _ a b)  = isConstant a && isConstant b
 isConstant (FFunc (Function _ params expr) args) = isConstant (betaReduce expr (zip params args))
 
 
 -- Kræsjer om uttrykket ikke er en konstant.
 eval :: (Show n, RealFloat n) => Expr n -> Either Text n
-eval (Var x)       = Left ("Unexpected variable in 'constant': " <> x)
-eval (Z z)         = Right (fromInteger z)
-eval (R r)         = Right r
-eval (Const c)     = let (_, _, n) = constantFromConstr c in Right n
-eval (UFunc c a)   = let (_, _, f) = uFuncFromConstr c in f <$> eval a
-eval (BFunc c a b) = let (_, _, f) = bFuncFromConstr c in f <$> eval a <*> eval b
+eval (BoundedVar v) = Left ("Unexpected variable in 'constant': " <> v)
+eval (FreeVar v ex) = eval ex
+eval (Z z)          = Right (fromInteger z)
+eval (R r)          = Right r
+eval (Const c)      = let (_, _, n) = constantFromConstr c in Right n
+eval (UFunc c a)    = let (_, _, f) = uFuncFromConstr c in f <$> eval a
+eval (BFunc (Prefix Log) a b) = case (eval a, eval b) of
+    (Right x, Right y) | x <= 0 -> Left (pack ("The base of a logarithm must be strictly positive, but was: " <> show x))
+                       | y <= 0 -> Left (pack ("The argument to a log has to be strictly positive, but was: " <> show y))
+                       | otherwise -> let (_, _, f) = bFuncFromConstr (Prefix Log) in Right (f x y)
+    (Left err, _) -> Left err
+    (_, Left err) -> Left err
+eval (BFunc c a b)  = let (_, _, f) = bFuncFromConstr c in f <$> eval a <*> eval b
 eval (FFunc f@(Function name params expr) args) = eval (betaReduce expr (zip params args))

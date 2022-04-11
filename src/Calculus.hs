@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 
-module Calculus (differentiate, simplify) where
+module Calculus (differentiate, simplify, simplifyFunction) where
 
 
 import Data.Text (Text)
@@ -15,8 +15,8 @@ import Expr
 import Utility
 
 
---simplifyFunction :: Function n -> Function n
---simplifyFunction (Function name params ex) = Function name params (simplify ex)
+simplifyFunction :: RealFloat n => Function n -> Function n
+simplifyFunction (Function name params ex) = Function name params (simplify ex)
 
 differentiate :: (RealFloat n) => Expr n -> Text -> Either Text (Expr n)
 differentiate expr x = fmap simplify (diff (simplify expr) x)
@@ -31,8 +31,10 @@ diff (R _) _ = Right (R 0)
 diff (Const _) _ = Right (Z 0)
 
 -- x' = 1, y' = 0
-diff (Var v) x | v == x = Right (Z 1)
-               | otherwise = Right (Z 0)
+diff (BoundedVar v) x | v == x = Right (Z 1)
+                      | otherwise = Right (Z 0)
+
+diff (FreeVar _ ex) x = diff ex x
 
 -- (f + g)' = f' + g'
 diff (BFunc (Infix Add) a b) x = BFunc (Infix Add) <$> diff a x <*> diff b x
@@ -143,7 +145,8 @@ simp (BFunc (Infix Div) (R r1) (R r2)) = R (r1 / r2)
 simp (R n) = R n
 simp (Z n) = Z n
 simp (Const c) = Const c
-simp (Var x) = Var x
+simp (FreeVar v ex) = FreeVar v ex
+simp (BoundedVar v) = BoundedVar v
 simp (BFunc c a b) = BFunc c (simp a) (simp b)
 simp (UFunc c a) = UFunc c (simp a)
 simp (FFunc (Function name params expr) args) = FFunc (Function name params (simp expr)) (map simp args)
