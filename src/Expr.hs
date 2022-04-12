@@ -15,6 +15,8 @@ import Data.List (intercalate, foldr1, intersperse)
 import TextShow (TextShow(..), showbParen, showb, fromText, toText, toString)
 import Data.Maybe (listToMaybe)
 
+import Test.LeanCheck
+
 import Utility (realToRat, Debug(debug))
 
 
@@ -229,6 +231,22 @@ instance Show n => Debug (Expr n) where
 instance Show n => Debug (Function n) where
     debug (Function name params expr) = unpack name <> "(" <> intercalate "," (map unpack params) <> ") = " <> debug expr
 
+instance Listable UnaryFunction where
+    list = [Sin, Cos, Tan, USub, Ceiling, Floor, Sqrt, Succ, Pred, Abs, Asin, Acos, Atan, Sinh, Cosh, Tanh, Asinh, Acosh, Atanh]
+
+instance Listable BinaryFunction where
+    list = {-map Prefix [Log, Max, Min] ++-} map Infix [Add, BSub, Mult, Div, Expo]
+
+instance Listable Constant where
+    list = [E, Pi]
+
+instance RealFloat n => Listable (Expr n) where
+    tiers = cons1 Z
+         \/ [map R [0, 1, -1, 2*pi, -0.000001, 0.000002, 1213123123, -54764235]]
+         \/ cons2 UFunc
+         \/ cons3 BFunc
+         \/ cons1 Const
+
 -- erstatter alle variabler med sin nye verdi.
 betaReduce :: Expr n -> [(Text, Expr n)] -> Expr n
 betaReduce = betaReduce' []
@@ -267,6 +285,7 @@ eval (UFunc c a)    = let (_, _, f) = uFuncFromConstr c in f <$> eval a
 eval (BFunc (Prefix Log) a b) = case (eval a, eval b) of
     (Right x, Right y) | x <= 0 -> Left (pack ("Error: The base of a logarithm must be strictly positive, but was: " <> show x))
                        | y <= 0 -> Left (pack ("Error: The argument to a log has to be strictly positive, but was: " <> show y))
+                       | x == 1 -> Left (pack "Error: The base of a logarithm cannot be 1.")
                        | otherwise -> let (_, _, f) = bFuncFromConstr (Prefix Log) in Right (f x y)
     (Left err, _) -> Left err
     (_, Left err) -> Left err

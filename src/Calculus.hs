@@ -7,7 +7,7 @@ module Calculus where
 
 import Data.Text (Text)
 import TextShow (TextShow)
-import Data.List (sort)
+import Data.List (sort, find, delete)
 
 import Debug.Trace
 
@@ -97,10 +97,10 @@ diff (BFunc (Infix c)  _ _) _ = let (_, name, _) = bFuncFromConstr (Infix  c) in
 diff (UFunc c _) _ = let (_, name, _) = uFuncFromConstr c in Left ("The function " <> name <> " has no defined derivative (yet)")
 
 
--- TODOOOO
 simplify :: (RealFloat n) => Expr n -> Expr n
-simplify ex | simp ex == ex = ex
-            | otherwise = simplify (simp ex)
+simplify ex | simp ex /= ex = simplify (simp ex)
+            | simpAddMult ex /= ex = simplify (simpAddMult ex)
+            | otherwise = ex
 
 simp :: (RealFloat n) => Expr n -> Expr n
 simp (R r) | r == fromInteger (round r) = Z (round r)      -- a.0 = a
@@ -122,7 +122,6 @@ simp (BFunc (Infix BSub) b (Z 0)) = simp b              -- b-0 = b
 simp (BFunc (Infix BSub) (Z z1) (Z z2)) = Z (z1-z2)
 simp (BFunc (Infix BSub) (R r1) (R r2)) = R (r1-r2)
 
-
 simp (BFunc (Infix Mult) a (Z 1)) = simp a              -- a * 1 = a
 simp (BFunc (Infix Mult) (Z 1) b) = simp b              -- 1 * a = a
 simp (BFunc (Infix Mult) _ (Z 0)) = Z 0                 -- a * 0 = 0
@@ -138,7 +137,7 @@ simp (BFunc (Infix Mult) (BFunc (Infix Expo) a b) (BFunc (Infix Expo) c d)) | a 
 
                                                         -- (a/b) / (c/d) = (a*d) / (b*c)
 simp (BFunc (Infix Div) (BFunc (Infix Div) a b) (BFunc (Infix Div) c d)) = (a*d) / (b*c)
-simp (BFunc (Infix Div) (Z z1) (Z z2)) | mod z1 z2 == 0 = Z (div z1 z2)
+simp (BFunc (Infix Div) (Z z1) (Z z2)) | z2 /= 0 && mod z1 z2 == 0 = Z (div z1 z2)
                                        | otherwise = Z (z1 `div` gcd z1 z2) / Z (z2 `div` gcd z1 z2)
 simp (BFunc (Infix Div) (R r1) (R r2)) = R (r1 / r2)
 simp (BFunc (Infix Div) (Z 0) _) = Z 0
@@ -151,19 +150,57 @@ simp (BFunc (Infix Div) (BFunc (Infix Expo) a b) (BFunc (Infix Expo) c d)) | a =
 
 simp (BFunc (Infix Expo) a 0) = 1
 simp (BFunc (Infix Expo) a 1) = a
-
+simp (BFunc (Infix Expo) 0 _) = 0
 
 
 
 -- Resten av casene, når ingen av reglene gjelder
-simp (R n) = R n
-simp (Z n) = Z n
-simp (Const c) = Const c
-simp (FreeVar v ex) = FreeVar v ex
-simp (BoundedVar v) = BoundedVar v
-simp (BFunc c a b) = BFunc c (simp a) (simp b)
-simp (UFunc c a) = UFunc c (simp a)
+simp (R n)                                    = R n
+simp (Z n)                                    = Z n
+simp (Const c)                                = Const c
+simp (FreeVar v ex)                           = FreeVar v ex
+simp (BoundedVar v)                           = BoundedVar v
+simp (BFunc c a b)                            = BFunc c (simp a) (simp b)
+simp (UFunc c a)                              = UFunc c (simp a)
 simp (FFunc (Function name params expr) args) = FFunc (Function name params (simp expr)) (map simp args)
+
+
+simpAddMult :: RealFloat n => Expr n -> Expr n
+simpAddMult ex | ex /= simpAdd ex = simpAdd ex
+               | ex /= simpMult ex = simpMult ex
+simpAddMult (R n)                                    = R n
+simpAddMult (Z n)                                    = Z n
+simpAddMult (Const c)                                = Const c
+simpAddMult (FreeVar v ex)                           = FreeVar v ex
+simpAddMult (BoundedVar v)                           = BoundedVar v
+simpAddMult (BFunc c a b)                            = BFunc c (simpAddMult a) (simpAddMult b)
+simpAddMult (UFunc c a)                              = UFunc c (simpAddMult a)
+simpAddMult (FFunc (Function name params expr) args) = FFunc (Function name params (simpAddMult expr)) (map simpAddMult args)
+
+simpAdd :: RealFloat n => Expr n -> Expr n
+simpAdd = listAdd . simpAddList . addList
+
+simpMult :: RealFloat n => Expr n -> Expr n
+simpMult ex = let (xs, ys) = multList ex
+              in  listMult $ simpMultDiv (simpMultList xs, simpMultList ys)
+
+simpMultDiv :: RealFloat n => ([Expr n], [Expr n]) -> ([Expr n], [Expr n])
+simpMultDiv (xs, []) = (xs, [])
+simpMultDiv (xs, y:ys) = case find (\x -> x/y /= simp (x/y)) xs of
+    Just  x -> let (xs', ys') = simpMultDiv (delete x xs, ys) in (simp (x/y) : xs', ys')
+    Nothing -> fmap (y:) (simpMultDiv (xs, ys))
+
+simpMultList :: RealFloat n => [Expr n] -> [Expr n]
+simpMultList [] = []
+simpMultList (x:xs) = case find (\y -> x*y /= simp (x*y)) xs of
+    Just  y -> simp (x*y) : simpMultList (delete y xs)
+    Nothing -> x : simpMultList xs
+
+simpAddList :: RealFloat n => [Expr n] -> [Expr n]
+simpAddList [] = []
+simpAddList (x:xs) = case find (\y -> x+y /= simp (x+y)) xs of
+    Just  y -> simp (x+y) : simpAddList (delete y xs)
+    Nothing -> x : simpAddList xs
 
 
 multList :: Expr n -> ([Expr n], [Expr n])

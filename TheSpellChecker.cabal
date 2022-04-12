@@ -39,12 +39,14 @@ library
   hs-source-dirs:
       src
   build-depends:
-      HUnit
+      Decimal
+    , HUnit
     , base >=4.7 && <5
     , cyclotomic
     , finite-typelits
     , ghc-typelits-extra
     , ghc-typelits-knownnat
+    , leancheck
     , megaparsec
     , mtl
     , numbers
@@ -63,13 +65,15 @@ executable TheSpellChecker-exe
       app
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      HUnit
+      Decimal
+    , HUnit
     , TheSpellChecker
     , base >=4.7 && <5
     , cyclotomic
     , finite-typelits
     , ghc-typelits-extra
     , ghc-typelits-knownnat
+    , leancheck
     , megaparsec
     , mtl
     , numbers
@@ -84,6 +88,7 @@ test-suite TheSpellChecker-test
   type: exitcode-stdio-1.0
   main-is: TestMain.hs
   other-modules:
+      TestCalculus
       TestExpr
       TestParser
       Paths_TheSpellChecker
@@ -91,13 +96,15 @@ test-suite TheSpellChecker-test
       test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      HUnit
+      Decimal
+    , HUnit
     , TheSpellChecker
     , base >=4.7 && <5
     , cyclotomic
     , finite-typelits
     , ghc-typelits-extra
     , ghc-typelits-knownnat
+    , leancheck
     , megaparsec
     , mtl
     , numbers

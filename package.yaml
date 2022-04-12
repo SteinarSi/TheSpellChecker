@@ -34,6 +34,8 @@ dependencies:
 - ghc-typelits-extra
 - split
 - finite-typelits
+- leancheck
+- Decimal
 
 library:
   source-dirs: src
