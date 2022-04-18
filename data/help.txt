@@ -2,16 +2,19 @@
 Welcome to S.U.C.C: Steinar's Unique Calculus Calculator
 
 
-Some commands:
+Some things that can be done:
 
 Define a new function:
-f(x1, x2, .... xn) = <expr>
+f(x, y) = 5x + y^2
 
-Evaluate a function:
-f(a1, a2, .... a3)
+Evaluate an expression just by typing it:
+3+f(4, 5)
 
 Show a function:
 f
 
-After defining a function f, get its derivatives (if possible) by referring to f', f'', etc
-f'
+Get a function derivatives (if possible) by referring to f', f'', etc:
+f(3, 4) + f'(5, 6) + f''(10, 20)
+The default is differentiating with respect to its first parameter, 
+but you can differentiate with respect to any parameter (for example y) by typing
+TODO

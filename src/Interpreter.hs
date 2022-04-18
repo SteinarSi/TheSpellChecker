@@ -14,19 +14,23 @@ import ParseExpr ( parse )
 import ParseREPL( parseCommand,Command(..) )
 import ParserUtility (UserData(..))
 import Calculus (simplify, simplifyFunction)
+import qualified Draw as D
 
 
 
-loop :: [UserData Double] -> IO ()
-loop fs = do
+loop :: [UserData Double] -> [D.Drawable Double] -> IO ()
+loop fs ds = do
     inn <- getLine
     case parseCommand fs (T.pack inn) of 
-        Left err -> print err >> loop fs
+        Left err -> print err >> loop fs ds
         Right ex -> case ex of
-            Help -> readFile "data/help.txt" >>= putStrLn >> loop fs
+            Help -> readFile "data/help.txt" >>= putStrLn >> loop fs ds
             Quit -> putStrLn "Bye-bye!"
-            NoAction -> loop fs
-            NewFunction f@(Function name params ex) -> let uf = UserFunction (simplifyFunction f) in loop (uf : delete uf fs)
-            NewVariable name ex -> loop (UserVariable name (simplify ex) : fs)
-            Eval ex -> putStrLn (either T.unpack (\r -> toString (showb ex <> " = " <> showb r)) (eval ex)) >> loop fs
-            ShowFunction f -> print f >> loop fs
+            NoAction -> loop fs ds
+            NewFunction f@(Function name params ex) -> let uf = UserFunction (simplifyFunction f) in loop (uf : delete uf fs) ds
+            NewVariable name ex -> loop (UserVariable name (simplify ex) : fs) ds
+            Eval ex -> putStrLn (either T.unpack (\r -> toString (showb ex <> " = " <> showb r)) (eval ex)) >> loop fs ds
+            ShowFunction f -> print f >> loop fs ds
+            Draw -> D.draw ds >> loop fs ds
+            Clear -> loop fs []
+            AddDrawable d -> loop fs (d:ds)

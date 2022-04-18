@@ -26,6 +26,7 @@ source-repository head
 library
   exposed-modules:
       Calculus
+      Draw
       Expr
       Interpreter
       Linalg
@@ -47,6 +48,7 @@ library
     , finite-typelits
     , ghc-typelits-extra
     , ghc-typelits-knownnat
+    , gloss <=1.13.2.1
     , leancheck
     , megaparsec
     , mtl
@@ -76,6 +78,7 @@ executable TheSpellChecker-exe
     , finite-typelits
     , ghc-typelits-extra
     , ghc-typelits-knownnat
+    , gloss <=1.13.2.1
     , leancheck
     , megaparsec
     , mtl
@@ -109,6 +112,7 @@ test-suite TheSpellChecker-test
     , finite-typelits
     , ghc-typelits-extra
     , ghc-typelits-knownnat
+    , gloss <=1.13.2.1
     , leancheck
     , megaparsec
     , mtl

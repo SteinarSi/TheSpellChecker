@@ -68,18 +68,6 @@ parseFactorList = fmap ((:) . flip (BFunc (Infix Mult))) ((char '*' *> parseFact
               <|> fmap ((:) . flip (BFunc (Infix Div )))  (char '/' *> parseFactor) <*> parseFactorList
               <|> pure []
 
-parseVar :: Parser n (Expr n)
-parseVar = do
-    var <- T.pack <$> many1 letter
-    (dt, ps) <- lift get -- look at me, I understand monad transformers now!
-    if var `elem` ps then pure (BoundedVar var)
-    else case find (==UserVariable var (Z 0)) dt of
-         Nothing -> failT ("Unrecognized variable name: " <> var)
-         Just (UserVariable v ex) -> pure (FreeVar v ex)
-         Just _ -> error "bruh"
-    
-    --maybe (failT ("Unrecognized variable name: " <> var)) (\(UserVariable n ex) -> FreeVar n ex) (find (==UserVariable var (Z 0)) dt)
-
 parseParam :: Parser n String
 parseParam = many1 letter
 

@@ -12,7 +12,7 @@ import Control.Monad.State.Lazy
 import Data.Void (Void)
 import Data.Text (Text)
 import Data.Text.Read (double)
-import Data.List (foldl')
+import Data.List (foldl', find)
 import qualified Data.Text as T
 
 import Expr
@@ -52,6 +52,16 @@ parseFloat = do
     case double (before <> comma <> after) of
         Left err     -> fail err
         Right (n, _) -> pure (realToRat n)
+
+parseVar :: Parser n (Expr n)
+parseVar = do
+    var <- T.pack <$> many1 letter
+    (dt, ps) <- lift get -- look at me, I understand monad transformers now!
+    if var `elem` ps then pure (BoundedVar var)
+    else case find (==UserVariable var (Z 0)) dt of
+         Nothing -> failT ("Unrecognized variable name: " <> var)
+         Just (UserVariable v ex) -> pure (FreeVar v ex)
+         Just _ -> error "bruh"
 
 parseInteger :: Parser n Integer
 parseInteger = read <$> many1 digit
