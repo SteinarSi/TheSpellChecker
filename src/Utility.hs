@@ -1,4 +1,4 @@
-
+{-# LANGUAGE FlexibleInstances #-}
 
 module Utility where
 
@@ -7,6 +7,7 @@ import Data.Number.RealCyclotomic (RealCyclotomic, toReal, sqrtRat)
 import Data.Text (Text, unpack, pack)
 import TextShow --(TextShow, showb)
 import Data.Number.CReal
+import Data.Decimal
 
 
 realToRat :: (Real a, Fractional b) => a -> b
@@ -58,3 +59,18 @@ class Debug a where
 --  ikke blir helt nøyaktige, men det er fortsatt bedre enn å bare bruke Floats.
 cheat :: (RealFloat b, Real a, Fractional c) => (b -> a) -> RealCyclotomic -> c
 cheat f = realToRat . f . toReal
+
+class AEQ a where
+    (~~) :: a -> a -> Bool
+
+    (/~) :: a -> a -> Bool
+    (/~) = (not .) . (~~)
+
+instance AEQ a => AEQ (Either Text a) where
+    (~~) (Left t1) (Left t2) = t1 == t2
+    (~~) (Right x1) (Right x2) = x1 ~~ x2
+    (~~) _ _ = False
+
+instance AEQ Double where
+    (~~) a b = realFracToDecimal acc a == realFracToDecimal acc b
+        where acc = 6

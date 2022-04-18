@@ -36,6 +36,8 @@ dependencies:
 - finite-typelits
 - leancheck
 - Decimal
+- approximate-equality
+- type-level-numbers
 
 library:
   source-dirs: src

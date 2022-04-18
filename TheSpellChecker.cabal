@@ -41,6 +41,7 @@ library
   build-depends:
       Decimal
     , HUnit
+    , approximate-equality
     , base >=4.7 && <5
     , cyclotomic
     , finite-typelits
@@ -54,6 +55,7 @@ library
     , text
     , text-show
     , transformers
+    , type-level-numbers
     , vector-sized
   default-language: Haskell2010
 
@@ -68,6 +70,7 @@ executable TheSpellChecker-exe
       Decimal
     , HUnit
     , TheSpellChecker
+    , approximate-equality
     , base >=4.7 && <5
     , cyclotomic
     , finite-typelits
@@ -81,6 +84,7 @@ executable TheSpellChecker-exe
     , text
     , text-show
     , transformers
+    , type-level-numbers
     , vector-sized
   default-language: Haskell2010
 
@@ -99,6 +103,7 @@ test-suite TheSpellChecker-test
       Decimal
     , HUnit
     , TheSpellChecker
+    , approximate-equality
     , base >=4.7 && <5
     , cyclotomic
     , finite-typelits
@@ -112,5 +117,6 @@ test-suite TheSpellChecker-test
     , text
     , text-show
     , transformers
+    , type-level-numbers
     , vector-sized
   default-language: Haskell2010

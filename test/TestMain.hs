@@ -8,4 +8,4 @@ import Test.HUnit
 
 
 main :: IO Counts
-main = checkFor 10000 propSimplify >> runTestTT (TestList [testParser, testExpr])
+main = mapM_ print (counterExamples 100000 propSimplify) >> runTestTT (TestList [testParser, testExpr]) 

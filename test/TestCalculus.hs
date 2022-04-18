@@ -1,32 +1,29 @@
-{-# LANGUAGE FlexibleInstances #-}
+
+{-# LANGUAGE DataKinds #-}
 
 module TestCalculus where
 
 import Test.LeanCheck
-import Data.Text
-import Data.Decimal
+import Data.Eq.Approximate
+import TypeLevel.Number.Nat
 
 import Expr
 import Calculus (simplify)
+import Utility
+
 
 
 
 import Debug.Trace
 
 
-propSimplify :: Expr Double -> Bool
+type ApproxDouble = AbsolutelyApproximateValue (Digits Z) Double
+
+
+propSimplify :: Expr ApproxDouble -> Bool
 propSimplify ex | b = b
-                | otherwise = trace ("\nExpr: " ++ debug ex ++ "\n" ++ show (eval ex) ++ " /= " ++ show (eval (simplify ex))) b
-    where b = eval ex ~~ eval (simplify ex)
-
-class AEQ a where
-    (~~) :: a -> a -> Bool
-
-instance AEQ a => AEQ (Either Text a) where
-    (~~) (Left t1) (Left t2) = t1 == t2
-    (~~) (Right x1) (Right x2) = x1 ~~ x2
-    (~~) _ _ = False
-
-instance AEQ Double where
-    (~~) a b = realFracToDecimal acc a == realFracToDecimal acc b
-        where acc = 8
+                | otherwise = seq (showErr ex) b
+    where b = eval ex == eval (simplify ex)
+    
+showErr :: (RealFloat n, Show n) => Expr n -> Expr n
+showErr ex = trace ("\nExpr: " ++ debug ex ++ "\n" ++ debug (simplify ex) ++ "\n" ++ show (eval ex) ++ " /= " ++ show (eval (simplify ex)) ++ "\n") ex

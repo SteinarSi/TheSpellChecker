@@ -28,8 +28,7 @@ data Solution (n :: Nat) a = Unique (Vector n a) | Unlimited (Vector n a) (Vecto
     deriving Show
 
 reduce :: (KnownNat m, KnownNat n, Fractional a, Eq a) => Matrix m n a -> Matrix m n a
-reduce a = let (a', w) = runWriter (reduceWriter a)
-           in  a'
+reduce = fst . runWriter . reduceWriter
 
 reduceWriter :: forall m n a. (KnownNat m, KnownNat n, Fractional a, Eq a) => Matrix m n a -> Writer [a -> a] (Matrix m n a)
 reduceWriter = reduceWriter' 0 0
@@ -64,7 +63,7 @@ solve a y | elem (nF reduced) (map snd ps) = Inconsistent
             in  vector $ fromJust $ V.fromList $ aug ++ replicate (nS a - length aug) 0
 
 det :: forall m n a. (KnownNat m, KnownNat n, Fractional a, Eq a) => Matrix m n a -> a
-det a | natVal @n Proxy /= natVal @m Proxy = 0
+det a | nS a /= mS a = 0
       | otherwise = let (a', fs) = runWriter (reduceWriter a)
                     in  foldl' (&) (product (diag a')) fs
 

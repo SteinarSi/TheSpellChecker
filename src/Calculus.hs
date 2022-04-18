@@ -8,6 +8,7 @@ module Calculus where
 import Data.Text (Text)
 import TextShow (TextShow)
 import Data.List (sort, find, delete)
+import Control.Monad.Writer
 
 import Debug.Trace
 
@@ -97,6 +98,12 @@ diff (BFunc (Infix c)  _ _) _ = let (_, name, _) = bFuncFromConstr (Infix  c) in
 diff (UFunc c _) _ = let (_, name, _) = uFuncFromConstr c in Left ("The function " <> name <> " has no defined derivative (yet)")
 
 
+simplifyWriter :: RealFloat n => Expr n -> Writer [Expr n] (Expr n)
+simplifyWriter ex | simp ex /= ex = tell [ex] >> simplifyWriter (simp ex)
+                  | simpAddMult ex /= ex = tell [ex] >> simplifyWriter (simpAddMult ex)
+                  | otherwise = writer (ex, [ex])
+
+
 simplify :: (RealFloat n) => Expr n -> Expr n
 simplify ex | simp ex /= ex = simplify (simp ex)
             | simpAddMult ex /= ex = simplify (simpAddMult ex)
@@ -116,6 +123,8 @@ simp (BFunc (Infix Add) a b) | a == b = 2 * a
 simp (BFunc (Infix Add) (Z z1) (Z z2)) = Z (z1+z2)
 simp (BFunc (Infix Add) (R r1) (R r2)) = R (r1+r2)
 
+simp (UFunc USub (R r)) = R (negate r)
+simp (UFunc USub (Z z)) = Z (negate z)
 simp (UFunc USub (UFunc USub a)) = simp a               -- -(-a) = a
 simp (BFunc (Infix BSub) (Z 0) b) = UFunc USub (simp b) -- 0 - b = -b
 simp (BFunc (Infix BSub) b (Z 0)) = simp b              -- b-0 = b
@@ -127,7 +136,7 @@ simp (BFunc (Infix Mult) (Z 1) b) = simp b              -- 1 * a = a
 simp (BFunc (Infix Mult) _ (Z 0)) = Z 0                 -- a * 0 = 0
 simp (BFunc (Infix Mult) (Z 0) _) = Z 0                 -- 0 * a = 0
 simp (BFunc (Infix Mult) (Z z1) (Z z2)) = Z (z1*z2)
-simp (BFunc (Infix Mult) (R r1) (R r2)) = R (r2*r2)
+--simp (BFunc (Infix Mult) (R r1) (R r2)) = R (r2*r2) --HVORFOR FUNGERER IKKE DETTE??????
                                                         -- (a/b) * (c/d) = (a*c) / (b*d)
 simp (BFunc (Infix Mult) (BFunc (Infix Div) a b) (BFunc (Infix Div) c d)) = (a*c) / (b*d)
 simp (BFunc (Infix Mult) a b) | a == b = a ** 2
