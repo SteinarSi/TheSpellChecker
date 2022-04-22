@@ -14,14 +14,20 @@ import Data.Functor (($>))
 import Data.Function ((&))
 import Data.List (foldl', find)
 import Data.Number.RealCyclotomic (RealCyclotomic)
+import Data.Bool (bool)
 
 import Control.Monad (replicateM)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.State (State, get, runState, evalState, modify)
 
+
+import Debug.Trace
+
 import Expr
 import Utility
 import ParserUtility
+import Data.Maybe (listToMaybe)
+import Calculus (differentiate, differentiateFunction)
 
 {-
 
@@ -92,9 +98,10 @@ parseFunctionCall = try (BFunc (Prefix Log) (Const E) <$> ((string "log" <|> str
             let Just (c, _, _) = bFuncFromName name
             BFunc c <$> (char '(' *> parseExpr <* char ',') <*> parseExpr <* char ')' )
        <|> (do
-            name <- T.pack <$> many1 letter
+            name    <- T.pack <$> many1 letter
+            d       <- length <$> many (char '\'')
             (fs, _) <- lift get
-            case [ f | UserFunction f@(Function fname _ _)<-fs, name == fname ] of
-                [] -> failT ("Unrecognized function: " <> name)
-                (f@(Function fname params ex):_) -> FFunc f <$> (char '(' *> replicateM (length params) (tryWhatever (char ',') parseExpr) <* char ')')
+            f1@(Function _ params _) <- maybe (failT ("Unrecognized function: " <> name)) pure $ listToMaybe [ f | UserFunction f@(Function fname _ _)<-fs, name == fname ]
+            f2@(Function fname params ex) <- either failT pure $ applyNtimesM d (`differentiateFunction` bool (head params) "default" (null params)) f1
+            FFunc f2 <$> (char '(' *> replicateM (length params) (tryWhatever (char ',') parseExpr) <* char ')')
        )

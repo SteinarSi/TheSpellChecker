@@ -6,7 +6,7 @@
 
 module Expr (Expr(..), Argument, Parameter, Constant(..), Function(Function), UnaryFunction(..), BinaryFunction(..),
     PrefixFunction(..), InfixFunction(..), bFunctions, uFunctions, bFuncFromName, uFuncFromName, bFuncFromConstr, uFuncFromConstr, isConstant,
-        betaReduce, uFuncNames, bFuncNames, debug, eval) where
+        betaReduce, uFuncNames, bFuncNames, debug, eval, inline) where
 
 import Data.Number.RealCyclotomic (RealCyclotomic, toReal, toRat)
 import Data.Text (Text, unpack, pack, toLower)
@@ -296,3 +296,12 @@ eval (BFunc (Infix Div) a b) = let (_, _, f) = bFuncFromConstr (Infix Div)
                                    Right d -> (`f` d) <$> eval a
 eval (BFunc c a b)  = let (_, _, f) = bFuncFromConstr c in f <$> eval a <*> eval b
 eval (FFunc f@(Function name params expr) args) = eval (betaReduce expr (zip params args))
+
+
+inline :: Expr n -> Expr n
+inline (FreeVar v ex) = ex
+inline (FFunc f@(Function _ params expr) args) = inline (betaReduce expr (zip params args))
+inline (UFunc c a) = UFunc c (inline a)
+inline (BFunc c a b) = BFunc c (inline a) (inline b)
+inline ex = ex
+

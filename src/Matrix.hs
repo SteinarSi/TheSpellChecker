@@ -8,6 +8,7 @@ module Matrix where
 import GHC.TypeLits (natVal, KnownNat, Nat, Symbol, type (+), type (*), type (-), type (<=?))
 import Data.Proxy (Proxy(..))
 import qualified Data.Vector.Sized as V
+import qualified Data.Vector as Unsized
 import Data.List.Split (chunksOf)
 import Data.Finite (Finite, finite, getFinite)
 import Control.Applicative (liftA2)
@@ -138,3 +139,16 @@ dot = (sum .) . (*)
 
 findindex :: forall n a. KnownNat n => Finite n -> (a -> Bool) -> Vector n a -> Maybe (Finite n)
 findindex u f a = find (>=u) (map (finite . fromIntegral) (findIndices f (V.toList (expose a))))
+
+
+
+lengthV :: forall a b. KnownNat a => V.Vector a b -> Integer
+lengthV _ = natVal @a Proxy
+
+testFunc :: Unsized.Vector Integer -> Integer
+testFunc (V.SomeSized v) = lengthV v
+    --sum (V.zipWith (+) v (V.replicate 1))
+        -- ^ here, v is `Sized.Vector n Int`, and we have `KnownNat n`
+
+testV :: Unsized.Vector Int
+testV = Unsized.fromList [1, 2, 3]

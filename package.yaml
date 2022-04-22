@@ -39,6 +39,7 @@ dependencies:
 - approximate-equality
 - type-level-numbers
 - gloss <= 1.13.2.1
+- vector
 
 library:
   source-dirs: src

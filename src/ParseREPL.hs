@@ -61,7 +61,7 @@ parseFunctionName = do
         Just f@(Function fname [] ex) -> pure f
         Just f@(Function fname (p:ps) ex) -> case applyNtimesM d (`differentiate` p) ex of
             Left err -> failT err
-            Right ex -> pure $ Function fname (p:ps) ex
+            Right ex -> pure $ Function (fname <> T.pack (replicate d '\'')) (p:ps) ex
 
 parsePoint :: (Show n, RealFloat n) => Parser n (D.Drawable n)
 parsePoint = D.Point <$> (char '(' *> parseConstant <* char ',') <*> parseConstant <* char ')'

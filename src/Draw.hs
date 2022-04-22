@@ -9,6 +9,7 @@ import Graphics.Gloss.Interface.IO.Game
 
 
 import Debug.Trace
+import Text.Megaparsec.Char (punctuationChar)
 
 
 
@@ -41,8 +42,8 @@ move e v = v
 
 
 drawLines :: View a -> Picture
-drawLines v = pictures [grid v, axes v]
-
+drawLines v = pictures [horizontal v]
+{-
 grid :: View a -> Picture 
 grid (View z h v _) = color (greyN 0.5) $ pictures []
 
@@ -51,3 +52,7 @@ axes (View z h v _) = color black $ pictures [line [(-1000, -stepsize z * h), (1
 
 stepsize :: Float -> Float
 stepsize z = 10**z
+-}
+
+horizontal :: View a -> Picture 
+horizontal (View z h _ _) = color black $ pictures $ line [(-1000, 0), (1000, 0)] : map (\x -> line [(x, -5), (x, 5)]) [-1000, -990, 1000]

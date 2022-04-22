@@ -34,6 +34,7 @@ library
       ParseExpr
       ParseREPL
       ParserUtility
+      UnsizedMatrix
       Utility
   other-modules:
       Paths_TheSpellChecker
@@ -58,6 +59,7 @@ library
     , text-show
     , transformers
     , type-level-numbers
+    , vector
     , vector-sized
   default-language: Haskell2010
 
@@ -88,6 +90,7 @@ executable TheSpellChecker-exe
     , text-show
     , transformers
     , type-level-numbers
+    , vector
     , vector-sized
   default-language: Haskell2010
 
@@ -122,5 +125,6 @@ test-suite TheSpellChecker-test
     , text-show
     , transformers
     , type-level-numbers
+    , vector
     , vector-sized
   default-language: Haskell2010

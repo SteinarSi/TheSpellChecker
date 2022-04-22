@@ -20,6 +20,9 @@ import Utility
 simplifyFunction :: RealFloat n => Function n -> Function n
 simplifyFunction (Function name params ex) = Function name params (simplify ex)
 
+differentiateFunction :: RealFloat n => Function n -> Text -> Either Text (Function n)
+differentiateFunction (Function name params ex) x = Function (name <> "'") params <$> differentiate ex x
+
 differentiate :: (RealFloat n) => Expr n -> Text -> Either Text (Expr n)
 differentiate expr x = fmap simplify (diff (simplify expr) x)
 
