@@ -1,5 +1,6 @@
 
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, TupleSections #-}
+{-# OPTIONS_GHC -Wno-overlapping-patterns #-}
 
 
 module Calculus where
@@ -11,11 +12,25 @@ import Data.List (sort, find, delete)
 import Control.Monad.Writer
 
 import Debug.Trace
+import Data.Either (rights)
 
 
 import Expr
 import Utility
 
+
+
+evalAll :: (RealFloat n, Enum n, Show n) => (n, n) -> Function n -> [[(n, n)]]
+evalAll it (Function _ [p] ex) = splitRights $ map (\x -> (x,) <$> eval (betaReduce ex [(p, R x)])) $ linspace 500 it
+evalAll _ _ = []
+
+
+splitRights :: [Either a b] -> [[b]]
+splitRights = splitRights' []
+    where splitRights' [] [] = []
+          splitRights' ys [] = [ys]
+          splitRights' ys (Left  _ : xs) = reverse ys : splitRights' [] xs
+          splitRights' ys (Right y : xs) = splitRights' (y:ys) xs
 
 simplifyFunction :: RealFloat n => Function n -> Function n
 simplifyFunction (Function name params ex) = Function name params (simplify ex)
@@ -72,33 +87,33 @@ diff (UFunc Sqrt f) x = diff (BFunc (Infix Expo) f (BFunc (Infix Div) (Z 1) (Z 2
 diff (BFunc (Infix Mult) a b) x = BFunc (Infix Add) <$> (BFunc (Infix Mult) <$> diff a x <*> Right b) <*> (BFunc (Infix Mult) a <$> diff b x)
 
 -- (f / g)' = (f' * g - f * g') / g^2
-diff (BFunc (Infix Div) f g) x = BFunc (Infix Div) <$> 
-    (BFunc (Infix BSub) <$> 
-        (BFunc (Infix Mult) <$> diff f x <*> Right g) <*> 
-        (BFunc (Infix Mult) f <$> diff g x)) <*> 
+diff (BFunc (Infix Div) f g) x = BFunc (Infix Div) <$>
+    (BFunc (Infix BSub) <$>
+        (BFunc (Infix Mult) <$> diff f x <*> Right g) <*>
+        (BFunc (Infix Mult) f <$> diff g x)) <*>
     Right (BFunc (Infix Expo) g (Z 2))
 
 -- (f^g)' = (f^g)*(f'*g/f + g'*ln(f))                                                                                                                                           -- (f^g)' = (f^g)*(f'*g/f + g'*ln(f))
-diff (BFunc (Infix Expo) f g) x = BFunc (Infix Mult) 
-        (BFunc (Infix Expo) f g) <$> 
-        (BFunc (Infix Add) <$> 
-            (BFunc (Infix Div) <$> (BFunc (Infix Mult) <$> diff f x <*> Right g) <*> Right f) <*> 
+diff (BFunc (Infix Expo) f g) x = BFunc (Infix Mult)
+        (BFunc (Infix Expo) f g) <$>
+        (BFunc (Infix Add) <$>
+            (BFunc (Infix Div) <$> (BFunc (Infix Mult) <$> diff f x <*> Right g) <*> Right f) <*>
             (BFunc (Infix Mult) <$> diff g x <*> Right (BFunc (Prefix Log) (Const E) f)))
 
 -- (ln(g))' = (ln(g')) / g
 diff (BFunc (Prefix Log) f g) x | f == Const E = BFunc (Infix Div) <$> diff g x <*> Right g
 
                             -- logf(g)' = (g'*ln(f)/g - ln(g)*f'/f) / (ln(f))^2
-                                | otherwise = BFunc (Infix Div) <$> 
-                                    (BFunc (Infix BSub) <$> 
-                                        (BFunc (Infix Div) <$> (BFunc (Infix Mult) <$> diff g x <*> Right (BFunc (Prefix Log) (Const E) f)) <*> Right g) <*> 
-                                        (BFunc (Infix Div) <$> (BFunc (Infix Mult) (BFunc (Prefix Log) (Const E) g) <$> diff f x) <*> Right f)) <*> 
+                                | otherwise = BFunc (Infix Div) <$>
+                                    (BFunc (Infix BSub) <$>
+                                        (BFunc (Infix Div) <$> (BFunc (Infix Mult) <$> diff g x <*> Right (BFunc (Prefix Log) (Const E) f)) <*> Right g) <*>
+                                        (BFunc (Infix Div) <$> (BFunc (Infix Mult) (BFunc (Prefix Log) (Const E) g) <$> diff f x) <*> Right f)) <*>
                                     Right (BFunc (Infix Expo) (BFunc (Prefix Log) (Const E) f) (Z 2))
 diff (FFunc (Function _ params expr) args) x = diff (betaReduce expr (zip params args)) x
 
-diff (BFunc (Prefix c) _ _) _ = let (_, name, _) = bFuncFromConstr (Prefix c) in Left ("The function " <> name <> "() has no defined derivative (yet)")
-diff (BFunc (Infix c)  _ _) _ = let (_, name, _) = bFuncFromConstr (Infix  c) in Left ("The operator " <> name <> " has no defined derivative (yet)")
-diff (UFunc c _) _ = let (_, name, _) = uFuncFromConstr c in Left ("The function " <> name <> " has no defined derivative (yet)")
+diff (BFunc (Prefix c) _ _) _ = let (_, name, _) = bFuncFromConstr (Prefix c) in Left ("The function " <> name <> "() has no defined derivative (yet (should it?)).")
+diff (BFunc (Infix c)  _ _) _ = let (_, name, _) = bFuncFromConstr (Infix  c) in Left ("The operator " <> name <> " has no defined derivative (yet (should it?)).")
+diff (UFunc c _) _ = let (_, name, _) = uFuncFromConstr c in Left ("The function " <> name <> "() has no defined derivative (yet (should it?)).")
 
 
 simplifyWriter :: RealFloat n => Expr n -> Writer [Expr n] (Expr n)
@@ -139,7 +154,8 @@ simp (BFunc (Infix Mult) (Z 1) b) = simp b              -- 1 * a = a
 simp (BFunc (Infix Mult) _ (Z 0)) = Z 0                 -- a * 0 = 0
 simp (BFunc (Infix Mult) (Z 0) _) = Z 0                 -- 0 * a = 0
 simp (BFunc (Infix Mult) (Z z1) (Z z2)) = Z (z1*z2)
---simp (BFunc (Infix Mult) (R r1) (R r2)) = R (r2*r2) --HVORFOR FUNGERER IKKE DETTE??????
+simp (BFunc (Infix Mult) (R r1) (R r2)) = R (r1*r2)
+
                                                         -- (a/b) * (c/d) = (a*c) / (b*d)
 simp (BFunc (Infix Mult) (BFunc (Infix Div) a b) (BFunc (Infix Div) c d)) = (a*c) / (b*d)
 simp (BFunc (Infix Mult) a b) | a == b = a ** 2
@@ -164,6 +180,14 @@ simp (BFunc (Infix Expo) a 0) = 1
 simp (BFunc (Infix Expo) a 1) = a
 simp (BFunc (Infix Expo) 0 _) = 0
 
+simp (UFunc Sin (Z 0)) = 0
+simp (UFunc Sin (Const Pi)) = 0
+simp (UFunc Sin (BFunc (Infix Mult) (Z _) (Const Pi))) = 0
+
+simp (UFunc Cos (Z 0)) = 1
+simp (UFunc Cos (Const Pi)) = -1
+simp (UFunc Cos (BFunc (Infix Mult) (Z z) (Const Pi))) | even z = 1
+                                                       | otherwise = -1
 
 
 -- Resten av casene, når ingen av reglene gjelder

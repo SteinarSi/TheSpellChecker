@@ -10,6 +10,11 @@ import Data.Number.CReal
 import Data.Decimal
 
 
+linspace :: (Fractional f, Enum f) => f -> (f, f) -> [f]
+linspace n (from, to) = let interval = to - from
+                            space = interval / (n-1)
+                        in  [from, from+space..to]
+
 realToRat :: (Real a, Fractional b) => a -> b
 realToRat = fromRational . realToFrac
 
@@ -74,3 +79,6 @@ instance AEQ a => AEQ (Either Text a) where
 instance AEQ Double where
     (~~) a b = realFracToDecimal acc a == realFracToDecimal acc b
         where acc = 6
+
+tmap :: (a -> b) -> (a, a) -> (b, b)
+tmap f (a, b) = (f a, f b)

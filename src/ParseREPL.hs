@@ -22,7 +22,7 @@ import ParserUtility ( parse, failT, letter, many1, tryWhatever, Parser, ParseEr
 import ParseExpr ( parseExpr )
 import Calculus (differentiate)
 import Utility (applyNtimesM)
-import qualified Draw as D
+import Draw
 
 
 data Command n = NewFunction (Function n)
@@ -32,7 +32,7 @@ data Command n = NewFunction (Function n)
                | NoAction
                | Draw
                | Clear
-               | AddDrawable (D.Drawable n)
+               | AddDrawable (Drawable n)
                | Quit
                | Help
 
@@ -48,7 +48,7 @@ parseCommand = parse parseCommand'
                 <|> try (Eval <$> parseExpr <* eof)
                 <|> try (NewFunction <$> (Function <$> parseName <*> (char '(' *> parseParams <* char ')' <* char '=') <*> parseExpr <* eof))
                 <|> try (NewVariable . T.pack <$> many1 letter <*> (many (char ' ') *> char '=' *> parseExpr ))
-                <|> try (AddDrawable <$> (string "add" *> (parsePoint <|> (D.Function <$> parseFunctionName))))
+                <|> try (AddDrawable <$> (string "add" *> (parsePoint <|> (DFunction <$> parseFunctionName))))
                 <|> NoAction <$ eof
 
 parseFunctionName :: (RealFloat n) => Parser n (Function n)
@@ -63,8 +63,8 @@ parseFunctionName = do
             Left err -> failT err
             Right ex -> pure $ Function (fname <> T.pack (replicate d '\'')) (p:ps) ex
 
-parsePoint :: (Show n, RealFloat n) => Parser n (D.Drawable n)
-parsePoint = D.Point <$> (char '(' *> parseConstant <* char ',') <*> parseConstant <* char ')'
+parsePoint :: (Show n, RealFloat n) => Parser n (Drawable n)
+parsePoint = Point <$> (char '(' *> parseConstant <* char ',') <*> parseConstant <* char ')'
 
 parseName :: Parser n Text
 parseName = T.pack <$> many letter

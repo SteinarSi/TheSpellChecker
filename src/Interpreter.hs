@@ -15,11 +15,11 @@ import ParseExpr ( parse )
 import ParseREPL( parseCommand,Command(..) )
 import ParserUtility (UserData(..))
 import Calculus (simplify, simplifyFunction)
-import qualified Draw as D
+import Draw
 
 
 
-loop :: [UserData Double] -> [D.Drawable Double] -> IO ()
+loop :: [UserData Double] -> [Drawable Double] -> IO ()
 loop fs ds = do
     inn <- getLine
     case parseCommand fs (T.pack inn) of 
@@ -32,6 +32,6 @@ loop fs ds = do
             NewVariable name ex -> loop (UserVariable name (simplify ex) : fs) ds
             Eval ex -> putStrLn (either T.unpack (\r -> toString (showb ex <> " = " <> showb r)) (eval ex)) >> loop fs ds
             ShowFunction f -> print f >> loop fs ds
-            Draw -> D.draw ds >> loop fs ds
+            Draw -> draw ds >> loop fs ds
             Clear -> loop fs []
             AddDrawable d -> loop fs (d:ds)
