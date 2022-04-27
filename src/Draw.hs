@@ -1,5 +1,5 @@
 
-{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RankNTypes, TupleSections #-}
 
 module Draw (draw, Drawable(..)) where
 
@@ -21,72 +21,72 @@ import Debug.Trace
 data Drawable a = Point a a
                 | DFunction (Function a)
 
-type Zoom = Float
-type HorizontalOffset = Float
-type VerticalOffset = Float
-
-data View a = View Zoom HorizontalOffset VerticalOffset [Drawable a]
 data World a = World CircleView [Drawable a]
-
-
-draw :: (Show a, RealFloat a, Enum a) => [Drawable a] -> IO ()
-draw ds = play FullScreen white 1 (World (CV 0 10) ds) paint move (const id)
-
-
-move :: Event -> World a -> World a
-move e@(EventKey (SpecialKey dir) Down _ _) w@(World cv ds) = case dir of
-    KeyRight -> World (walk cv True ) ds
-    KeyLeft  -> World (walk cv False) ds
-    KeyUp    -> w
-    KeyDown  -> w -- TODO
-    _        -> w
-move e@(EventKey (Char c) Down _ _) w@(World cv ds) = case c of
-    'z' -> World (zoom cv True ) ds
-    'x' -> World (zoom cv False) ds
-    _   -> w
-move e v = v
-
-
-
-
 data CircleView = CV {
-        center :: Float,
+        center :: (Float, Float),
         radius :: Float
     }
 
-zoom :: CircleView -> Bool -> CircleView
-zoom cv True  = CV (center cv) (radius cv / 2)
-zoom cv False = CV (center cv) (radius cv * 2)
+
+draw :: (Show a, RealFloat a, Enum a) => [Drawable a] -> IO ()
+draw ds = play FullScreen white 1 (World (CV (0, 0) 10) ds) paint move (const id)
 
 
-walk :: CircleView -> Bool -> CircleView
-walk cv True  = CV (center cv + radius cv / nTicks) (radius cv)
-walk cv False = CV (center cv - radius cv / nTicks) (radius cv)
-
+move :: Event -> World a -> World a
+move e@(EventKey (SpecialKey dir) Down _ _) w@(World (CV (x, y) r) ds) = case dir of
+    KeyRight -> World (CV (x + r / (nTicks-1), y) r) ds
+    KeyLeft  -> World (CV (x - r / (nTicks-1), y) r) ds
+    KeyUp    -> World (CV (x, y + r / (nTicks-1)) r) ds
+    KeyDown  -> World (CV (x, y - r / (nTicks-1)) r) ds
+    _        -> w
+move e@(EventKey (Char c) Down _ _) w@(World (CV (x, y) r) ds) = case c of
+    'z' -> World (CV (x, y) (r/2)) ds
+    'x' -> World (CV (x, y) (r*2)) ds
+    _   -> w
+move e v = v
 
 nTicks :: Float
-nTicks = 25
+nTicks = 21
 
 
 paint :: (Show a, RealFloat a, Enum a) => World a -> Picture
-paint w@(World cv dt) = pictures [xAxe cv, drawFeatures w]
+paint w@(World cv dt) = pictures [grid, xAxe cv, yAxe cv, drawFeatures w]
+
+grid :: Picture
+grid = color (greyN 0.65) $ pictures $ concatMap (\x -> [line [(-1000, x), (1000, x)], line [(x, -1000), (x, 1000)]]) $ linspace nTicks (-960, 960)
 
 drawFeatures :: (RealFloat a, Enum a, Show a) => World a -> Picture
 drawFeatures (World cv dt) = pictures $ map drawFeature dt
     where drawFeature :: (RealFloat a, Enum a, Show a) => Drawable a -> Picture
-          drawFeature (Point x y) = undefined  --translate (transcale cv x) (transcale y) (circle 2)
-          drawFeature (DFunction f) = pictures $ map (line . map (tmap (transcale cv . realToFrac))) $ evalAll (tmap realToFrac (bounds cv)) f
+          drawFeature (Point x y) = uncurry translate (transcale cv $ tmap realToFrac (x, y)) (circle 2)
+          drawFeature (DFunction f) = pictures $ map (line . map (transcale cv . tmap realToFrac)) $ evalAll (tmap realToFrac (bounds cv True)) f
+
+yAxe :: CircleView -> Picture
+yAxe cv@(CV (x,y) _) = pictures $ axe : map (\y -> pictures [label y, tick y]) (linspace nTicks (bounds cv False))
+    where
+          axe     = line [(transcaleX cv x, -1000), (transcaleX cv x, 1000)]
+          label y = uncurry translate (-15, transcaleY cv y) $ scale (1/12) (1/12) $ text $ show $ realFracToDecimal 3 y
+          tick  y = line [(-3, transcaleY cv y), (3, transcaleY cv y)]
 
 xAxe :: CircleView -> Picture
-xAxe cv = pictures $ map (\x -> pictures [label x, tick x]) $ linspace nTicks (bounds cv)
-    where f = transcale cv
-          label x = translate (f x - 10) (-10) $ scale (1/12) (1/12) $ text $ show $ realFracToDecimal 3 x
-          tick  x = line [(f x, 3), (f x, -3)]
+xAxe cv@(CV (x, y) _) = pictures $ axe : map (\x -> pictures [label x, tick x]) (linspace nTicks (bounds cv True))
+    where
+          axe     = line [(-1000, transcaleY cv y), (1000, transcaleY cv y)]
+          label x = uncurry translate (transcaleX cv x - 12, -13) $ scale (1/12) (1/12) $ text $ show $ realFracToDecimal 3 x
+          tick  x = line [(transcaleX cv x, -3), (transcaleX cv x, 3)]
 
-transcale :: CircleView -> Float -> Float
-transcale (CV c r) e = (e-c+r)*1920/(2*r) - 960
+-- Stor takk til Lukas for denne
+transcale :: CircleView -> (Float, Float) -> (Float, Float)
+transcale (CV (x, y) r) (x', y') = ((x'-x+r)*1920/(2*r)-960, (y'-y+r)*1920/(2*r)-960)
 
-bounds :: CircleView -> (Float, Float)
-bounds cv = (center cv - radius cv, center cv + radius cv)
+transcaleX :: CircleView -> Float -> Float
+transcaleX = (fst .) . (. (,0)) . transcale
+
+transcaleY :: CircleView -> Float -> Float
+transcaleY = (snd .) . (. (0,)) . transcale
+
+bounds :: CircleView -> Bool -> (Float, Float)
+bounds (CV (x, _) r) True  = (x-r, x+r)
+bounds (CV (_, y) r) False = (y-r, y+r)
 
 

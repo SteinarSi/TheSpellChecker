@@ -21,7 +21,7 @@ import Utility
 
 
 evalAll :: (RealFloat n, Enum n, Show n) => (n, n) -> Function n -> [[(n, n)]]
-evalAll it (Function _ [p] ex) = splitRights $ map (\x -> (x,) <$> eval (betaReduce ex [(p, R x)])) $ linspace 500 it
+evalAll it (Function _ [p] ex) = splitRights $ map (\x -> (x,) <$> eval (betaReduce ex [(p, R x)])) $ linspace 961 it
 evalAll _ _ = []
 
 
