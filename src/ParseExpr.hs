@@ -1,9 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 
-module ParseExpr (parseExpr, parse) where
+module ParseExpr (parseExpr) where
 
-import Text.Megaparsec ( (<|>), many, oneOf, MonadParsec(try, parseError), ParsecT, runParserT, ParseErrorBundle )
+import Text.Megaparsec ( (<|>), many, oneOf, MonadParsec(try, parseError), ParsecT, runParserT, ParseErrorBundle, lookAhead )
 import Text.Megaparsec.Char (char, string)
 import Data.Void (Void)
 import qualified Data.Text as T
@@ -90,12 +90,13 @@ parseFunctionCall :: (RealFloat n) => Parser n (Expr n)
 parseFunctionCall = try (BFunc (Prefix Log) (Const E) <$> ((string "log" <|> string "Log" <|> string "ln" <|> string "Ln") *> char '(' *> parseExpr <* char ')')) --log med e som base
        <|> try (BFunc (Prefix Log) <$> ((string "log" <|> string "Log") *> (char '[' *> parseExpr <* char ']' <|> fmap Z parseInteger)) <*> (char '(' *> parseExpr <* char ')')) -- log med custom base
        <|> try (do
-            name <- first [ try (string fname) | (_, fname, _) <- uFunctions, fname /= "-"]
-            let Just (c, _, _) = uFuncFromName name
+            --name <- first [ try (string fname) | (_, fname, _, _) <- uFunctions, fname /= "-"]
+            name <- first $ [try (string fname <* lookAhead (char '(')) | fname <- uFuncNames, fname /= "-"]
+            let Just (c, _, _, _) = uFuncFromName name
             UFunc c <$> (char '(' *> parseExpr <* char ')') )
        <|> try (do
-            name <- first [ try (string fname) | (_, fname, _) <- bFunctions]
-            let Just (c, _, _) = bFuncFromName name
+            name <- first [ try (string fname) | (_, fname, _, _) <- bFunctions]
+            let Just (c, _, _, _) = bFuncFromName name
             BFunc c <$> (char '(' *> parseExpr <* char ',') <*> parseExpr <* char ')' )
        <|> (do
             name    <- T.pack <$> many1 letter
@@ -105,3 +106,6 @@ parseFunctionCall = try (BFunc (Prefix Log) (Const E) <$> ((string "log" <|> str
             f2@(Function fname params ex) <- either failT pure $ applyNtimesM d (`differentiateFunction` bool (head params) "default" (null params)) f1
             FFunc f2 <$> (char '(' *> replicateM (length params) (tryWhatever (char ',') parseExpr) <* char ')')
        )
+
+testB = parse parseFunctionCall [] "tanh(2)"
+testA = parse (first [try (string "tan" <* lookAhead (char '(')), try (string "tanh") ]) [] "tanh(2)"

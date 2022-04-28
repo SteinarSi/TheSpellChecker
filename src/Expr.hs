@@ -14,6 +14,7 @@ import qualified Data.Text as T
 import Data.List (intercalate, foldr1, intersperse)
 import TextShow (TextShow(..), showbParen, showb, fromText, toText, toString)
 import Data.Maybe (listToMaybe)
+import Data.Bool (bool)
 
 import Test.LeanCheck
 
@@ -52,45 +53,52 @@ data PrefixFunction = Log | Max | Min
 data InfixFunction  = Add | BSub | Mult | Div | Expo
     deriving (Eq, Show)
 
+type UDomain a = Maybe (a -> Maybe Text)
+type BDomain a b = Maybe (a -> b -> Maybe Text)
+
 constants :: Floating n => [(Constant, Text, n)]
 constants = [
         (Pi, "pi", pi),
         (E, "e", 2.71828182845904523536028747)
     ]
 
-uFunctions :: RealFloat n => [(UnaryFunction, Text, n -> n)]
+uFunctions :: (RealFloat n, Show n) => [(UnaryFunction, Text, n -> n, UDomain n)]
 uFunctions = [
-        (Sin, "sin", sin),
-        (Cos, "cos", cos),
-        (Tan, "tan", tan),
-        (USub, "-", negate),
-        (Ceiling, "ceiling", fromIntegral . ceiling),
-        (Floor, "floor", fromIntegral . floor),
-        (Sqrt, "sqrt", sqrt),
-        (Succ, "succ", (+1)),
-        (Pred, "pred", subtract 1),
-        (Abs, "abs", abs),
-        (Asin, "asin", asin),
-        (Acos, "acos", acos),
-        (Atan, "atan", atan),
-        (Sinh, "sinh", sinh),
-        (Cosh, "cosh", cosh),
-        (Tanh, "tanh", tanh),
-        (Asinh, "asinh", asinh),
-        (Acosh, "acosh", acosh),
-        (Atanh, "atanh", atanh)
+        (Sin, "sin", sin, Nothing),
+        (Cos, "cos", cos, Nothing),
+        (Tan, "tan", tan, Nothing),
+        (USub, "-", negate, Nothing),
+        (Ceiling, "ceiling", fromIntegral . ceiling, Nothing),
+        (Floor, "floor", fromIntegral . floor, Nothing),
+        (Sqrt, "sqrt", sqrt, Just $ bool (Just "negative numbers have noe real roots (and no, I'm not implementing complex numbers)") Nothing . (>=0)),
+        (Succ, "succ", (+1), Nothing),
+        (Pred, "pred", subtract 1, Nothing),
+        (Abs, "abs", abs, Nothing),
+        (Asin, "asin", asin, Just $ \a -> bool (Just $ pack ("asin() is only defined on -1 <= x <= 1, but the argument was " <> show a <> ".")) Nothing (abs a <= 1)),
+        (Acos, "acos", acos, Just $ \a -> bool (Just $ pack ("acos() is only defined on -1 <= x <= 1, but the argument was " <> show a <> ".")) Nothing (abs a <= 1)),
+        (Atan, "atan", atan, Nothing),
+        (Sinh, "sinh", sinh, Nothing),
+        (Cosh, "cosh", cosh, Nothing),
+        (Tanh, "tanh", tanh, Nothing),
+        (Asinh, "asinh", asinh, Nothing),
+        (Acosh, "acosh", acosh, Just $ \a -> bool (Just $ pack ("acosh() is only defined for x >= 1, but the argument was " <> show a <> ".")) Nothing (a>=1)),
+        (Atanh, "atanh", atanh, Just $ \a -> bool (Just $ pack $ "atanh() is only defined for -1 < x < 1, but the argument was " <> show a <> ".") Nothing (a > -1 && a < 1))
     ]
 
-bFunctions :: RealFloat n => [(BinaryFunction, Text, n -> n -> n)]
+bFunctions :: (RealFloat n, Show n) => [(BinaryFunction, Text, n -> n -> n, BDomain n n)]
 bFunctions = [
-        (Infix Add, "+", (+)),
-        (Infix BSub, "-", (-)),
-        (Infix Mult, "*", (*)),
-        (Infix Div, "/", (/)),
-        (Prefix Log, "log", logBase),
-        (Infix Expo, "^", (**)),
-        (Prefix Max, "max", max),
-        (Prefix Min, "min", min)
+        (Infix Add, "+", (+), Nothing),
+        (Infix BSub, "-", (-), Nothing),
+        (Infix Mult, "*", (*), Nothing),
+        (Infix Div, "/", (/), Just (\_ b -> bool Nothing (Just "Error: Divison by zero.") (b==0))),
+        (Prefix Log, "log", logBase, Just (\a b -> case (a, b) of
+                                            (1, _) -> Just $ pack "Error: The base of a logarithm cannot be 1."
+                                            (a, b) | a <= 0 -> Just $ pack ("Error: The base of a logarithm must be strictly positive, but was: " <> show a <> ".")
+                                                   | b <= 0 -> Just $ pack ("Error: The argument to a log has to be strictly positive, but was: " <> show b <> ".")
+                                                   | otherwise -> Nothing)),
+        (Infix Expo, "^", (**), Nothing),
+        (Prefix Max, "max", max, Nothing),
+        (Prefix Min, "min", min, Nothing)
     ]
 
 infixPrecedence :: InfixFunction -> Int
@@ -104,22 +112,22 @@ constantFromConstr :: Floating n => Constant -> (Constant, Text, n)
 constantFromConstr c = head [ f | f@(con, _, _)<-constants, con == c ]
 
 uFuncNames :: [Text]
-uFuncNames = [name | (_, name, _) <- uFunctions]
+uFuncNames = [name | (_, name, _, _) <- uFunctions]
 
 bFuncNames :: [Text]
-bFuncNames = [name | (_, name, _) <- bFunctions]
+bFuncNames = [name | (_, name, _, _) <- bFunctions]
 
-uFuncFromName :: RealFloat n => Text -> Maybe (UnaryFunction, Text, n -> n)
-uFuncFromName t = listToMaybe [ f | f@(con, name, func) <- uFunctions, name == toLower t ]
+uFuncFromName :: (Show n, RealFloat n) => Text -> Maybe (UnaryFunction, Text, n -> n, UDomain n)
+uFuncFromName t = listToMaybe [ f | f@(_, name, _, _) <- uFunctions, name == toLower t ]
 
-bFuncFromName :: RealFloat n => Text-> Maybe (BinaryFunction, Text, n -> n -> n)
-bFuncFromName t = listToMaybe [ f | f@(con, name, func) <- bFunctions, name == toLower t ]
+bFuncFromName :: (Show n, RealFloat n) => Text-> Maybe (BinaryFunction, Text, n -> n -> n, BDomain n n)
+bFuncFromName t = listToMaybe [ f | f@(_, name, _, _) <- bFunctions, name == toLower t ]
 
-uFuncFromConstr :: RealFloat n => UnaryFunction -> (UnaryFunction, Text, n -> n)
-uFuncFromConstr c = head [ f | f@(con, name, func) <- uFunctions, con == c ]
+uFuncFromConstr :: (Show n, RealFloat n) => UnaryFunction -> (UnaryFunction, Text, n -> n, UDomain n)
+uFuncFromConstr c = head [ f | f@(con, _, _, _) <- uFunctions, con == c ]
 
-bFuncFromConstr :: RealFloat n => BinaryFunction -> (BinaryFunction, Text, n -> n -> n)
-bFuncFromConstr c = head [ f | f@(con, name, func) <- bFunctions, con == c ]
+bFuncFromConstr :: (Show n, RealFloat n) => BinaryFunction -> (BinaryFunction, Text, n -> n -> n, BDomain n n)
+bFuncFromConstr c = head [ f | f@(con, _, _, _) <- bFunctions, con == c ]
 
 
 instance (Floating n, TextShow n) => Show (Function n) where
@@ -138,11 +146,11 @@ instance (Floating n, TextShow n) => TextShow (Expr n) where
     showbPrec p (BoundedVar v)     = fromText v
     showbPrec p (FreeVar n _) = fromText n
     showbPrec p (UFunc USub a) = showbParen (5 < p) ("-" <> showbPrec 5 a)
-    showbPrec p (UFunc c a) = let (_, name, _) = uFuncFromConstr c in fromText name <> "(" <> showb a <> ")"
+    showbPrec p (UFunc c a) = let (_, name, _, _) = uFuncFromConstr c in fromText name <> "(" <> showb a <> ")"
     showbPrec p (BFunc (Prefix Log) (Const E) b) = "ln(" <> showb b <> ")"
     showbPrec p (BFunc (Prefix Log) a b) = "log[" <> showb a <> "](" <> showb b <> ")"
-    showbPrec p (BFunc (Prefix c) a b) = let (_, name, _) = bFuncFromConstr (Prefix c) in fromText name <> "(" <> showb a <> ", " <> showb b <> ")"
-    showbPrec p (BFunc (Infix c) a b) = let (_, op, _) = bFuncFromConstr (Infix c)
+    showbPrec p (BFunc (Prefix c) a b) = let (_, name, _, _) = bFuncFromConstr (Prefix c) in fromText name <> "(" <> showb a <> ", " <> showb b <> ")"
+    showbPrec p (BFunc (Infix c) a b) = let (_, op, _, _) = bFuncFromConstr (Infix c)
                                             opPrec = infixPrecedence c
                                         in  showbParen (opPrec < p) (showbPrec opPrec a <> fromText op <> showbPrec opPrec b)
 
@@ -222,7 +230,7 @@ instance Show n => Debug (Expr n) where
     debug (R r) = show r
     debug (UFunc c e) = "(" <> debug c <> " " <> debug e <> ")"
     debug (UFunc c e) = "(" <> debug c <> " " <> debug e <> ")"
-    debug (BFunc (Infix c) a b) = let (_, n, _) = bFuncFromConstr (Infix c)
+    debug (BFunc (Infix c) a b) = let (_, n, _, _) = bFuncFromConstr (Infix c)
                                   in "(" <> debug a <> " " <> unpack n <> " " <> debug b <>")"
     debug (BFunc (Prefix c) a b) = "(" <> debug c <> " " <> debug a <> " " <> debug b <> ")"
     debug (BoundedVar x) = "(Var " <> unpack x <> ")"
@@ -281,20 +289,17 @@ eval (FreeVar v ex) = eval ex
 eval (Z z)          = Right (fromInteger z)
 eval (R r)          = Right r
 eval (Const c)      = let (_, _, n) = constantFromConstr c in Right n
-eval (UFunc c a)    = let (_, _, f) = uFuncFromConstr c in f <$> eval a
-eval (BFunc (Prefix Log) a b) = case (eval a, eval b) of
-    (Right x, Right y) | x <= 0 -> Left (pack ("Error: The base of a logarithm must be strictly positive, but was: " <> show x))
-                       | y <= 0 -> Left (pack ("Error: The argument to a log has to be strictly positive, but was: " <> show y))
-                       | x == 1 -> Left (pack "Error: The base of a logarithm cannot be 1.")
-                       | otherwise -> let (_, _, f) = bFuncFromConstr (Prefix Log) in Right (f x y)
-    (Left err, _) -> Left err
-    (_, Left err) -> Left err
-eval (BFunc (Infix Div) a b) = let (_, _, f) = bFuncFromConstr (Infix Div)
-                               in  case eval b of
-                                   Left er -> Left er
-                                   Right 0 -> Left "Error: Cannot divide by zero."
-                                   Right d -> (`f` d) <$> eval a
-eval (BFunc c a b)  = let (_, _, f) = bFuncFromConstr c in f <$> eval a <*> eval b
+eval (UFunc c a)    = let (_, name, f, domain) = uFuncFromConstr c 
+                      in case (eval a, domain) of
+                         (Left er, _) -> Left er
+                         (Right x, Just d) -> maybe (Right (f x)) Left (d x)
+                         (Right x, Nothing) -> Right (f x)
+eval (BFunc c a b)  = let (_, name, f, domain) = bFuncFromConstr c 
+                      in case (eval a, eval b, domain) of
+                            (Right a', Right b', Nothing) -> Right (f a' b')
+                            (Right a', Right b', Just  d) -> maybe (Right (f a' b')) Left (d a' b')
+                            (Left err, _, _) -> Left err
+                            (_, Left err, _) -> Left err
 eval (FFunc f@(Function name params expr) args) = eval (betaReduce expr (zip params args))
 
 

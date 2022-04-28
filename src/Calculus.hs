@@ -1,5 +1,5 @@
 
-{-# LANGUAGE OverloadedStrings, TupleSections #-}
+{-# LANGUAGE OverloadedStrings, TupleSections, RankNTypes #-}
 {-# OPTIONS_GHC -Wno-overlapping-patterns #-}
 
 
@@ -11,7 +11,6 @@ import TextShow (TextShow)
 import Data.List (sort, find, delete)
 import Control.Monad.Writer
 
-import Debug.Trace
 import Data.Either (rights)
 
 
@@ -21,7 +20,7 @@ import Utility
 
 
 evalAll :: (RealFloat n, Enum n, Show n) => (n, n) -> Function n -> [[(n, n)]]
-evalAll it (Function _ [p] ex) = splitRights $ map (\x -> (x,) <$> eval (betaReduce ex [(p, R x)])) $ linspace 961 it
+evalAll it (Function _ [p] ex) = splitRights $ map (\x -> (x,) <$> eval (betaReduce ex [(p, R x)])) $ linspace 1921 it
 evalAll _ _ = []
 
 
@@ -111,9 +110,37 @@ diff (BFunc (Prefix Log) f g) x | f == Const E = BFunc (Infix Div) <$> diff g x 
                                     Right (BFunc (Infix Expo) (BFunc (Prefix Log) (Const E) f) (Z 2))
 diff (FFunc (Function _ params expr) args) x = diff (betaReduce expr (zip params args)) x
 
-diff (BFunc (Prefix c) _ _) _ = let (_, name, _) = bFuncFromConstr (Prefix c) in Left ("The function " <> name <> "() has no defined derivative (yet (should it?)).")
-diff (BFunc (Infix c)  _ _) _ = let (_, name, _) = bFuncFromConstr (Infix  c) in Left ("The operator " <> name <> " has no defined derivative (yet (should it?)).")
-diff (UFunc c _) _ = let (_, name, _) = uFuncFromConstr c in Left ("The function " <> name <> "() has no defined derivative (yet (should it?)).")
+-- sinh(f)' = f' * cosh(f)
+diff (UFunc Sinh f) x = fmap (* cosh f) (diff f x)
+
+-- cosh(f)' = f' * sin(f)
+diff (UFunc Cosh f) x = fmap (* sinh f) (diff f x)
+
+-- [tanh(f)]′ = f'/cosh2(f)
+diff (UFunc Tanh f) x = fmap (/ (cosh f * cosh f)) (diff f x)
+
+-- asin(f)' = f'/(sqrt(1-f^2))
+diff (UFunc Asin f) x = fmap (/ sqrt (1-f**2)) (diff f x)
+
+-- acos(f)' = - f'/sqrt(1-f^2)
+diff (UFunc Acos f) x = UFunc USub <$> fmap (/ (sqrt (1-f**2))) (diff f x)
+
+-- atan(f)' = f'/(1+f^2)
+diff (UFunc Atan f) x = fmap (/ (1 + f**2)) (diff f x)
+
+-- atanh(f)' = f'/(sqrt(f^2-1))
+diff (UFunc Asinh f) x = fmap (/ sqrt (f**2-1)) (diff f x)
+
+-- acosh(f)' = f'/(sqrt(f^2-1))
+diff (UFunc Acosh f) x = fmap (/ sqrt (f**2-1)) (diff f x)
+
+-- atanh(f)' = f'/(sqrt(1-f^2))
+diff (UFunc Atanh f) x = fmap (/ sqrt (1-f**2)) (diff f x)
+
+
+diff (BFunc (Prefix c) _ _) _ = let (_, name, _, _) = bFuncFromConstr (Prefix c) in Left ("The function " <> name <> "() has no defined derivative (yet) (should it?).")
+diff (BFunc (Infix c)  _ _) _ = let (_, name, _, _) = bFuncFromConstr (Infix  c) in Left ("The operator " <> name <> " has no defined derivative (yet) (should it?).")
+diff (UFunc c _) _ = let (_, name, _, _) = uFuncFromConstr c in Left ("The function " <> name <> "() has no defined derivative (yet) (should it?).")
 
 
 simplifyWriter :: RealFloat n => Expr n -> Writer [Expr n] (Expr n)

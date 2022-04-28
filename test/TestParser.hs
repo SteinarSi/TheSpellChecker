@@ -22,3 +22,6 @@ multPrecedence = TestCase (assertEqual "2+3*4" (Right (BFunc (Infix Add) (Z 2 ::
 
 noMult :: Test
 noMult = TestCase (assertEqual "2 - (3)" (Right (BFunc (Infix BSub) (Z 2 :: Expr CReal) (Z 3))) (parse parseExpr [] "2 - (3)"))
+
+
+showParseOpposite :: 

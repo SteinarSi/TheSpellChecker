@@ -11,9 +11,8 @@ import Data.List (delete)
 
 import Utility (debug)
 import Expr ( Function(Function), eval, inline )
-import ParseExpr ( parse )
 import ParseREPL( parseCommand,Command(..) )
-import ParserUtility (UserData(..))
+import ParserUtility (UserData(..), parse)
 import Calculus (simplify, simplifyFunction)
 import Draw
 
