@@ -17,7 +17,7 @@ Some things that can be done:
     f(3, 4) + f'(5, 6) + f''(10, 20)
     The default is differentiating with respect to its first parameter, 
     but you can differentiate with respect to any parameter (for example y) by typing
-        f'y
+        f'y(10, 20)
 
     Some self-explaining one-word commands:
         save

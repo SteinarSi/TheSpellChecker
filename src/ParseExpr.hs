@@ -80,5 +80,6 @@ parseFunctionCall = try (BFunc (Prefix Log) (Const E) <$> ((string "log" <|> str
             f1@(Function _ params _) <- maybe (failT ("Unrecognized function: " <> name)) pure $ listToMaybe [ f | UserFunction f@(Function fname _ _)<-fs, name == fname ]
             diffs   <- many (parseDiffArg params)
             f2@(Function fname params ex) <- either failT pure $ applyAllM (map (maybe (`differentiateFunction` (head params)) (flip differentiateFunction)) diffs) f1
-            FFunc f2 <$> (char '(' *> replicateM (length params) (tryWhatever (char ',') parseExpr) <* char ')')   
+            args <- char '(' *> replicateM (length params) (tryWhatever (char ',') parseExpr) <* char ')' <|> failT ("Could not parse arguments to the function " <> fname <> ".")
+            pure (FFunc f2 args)
         )
