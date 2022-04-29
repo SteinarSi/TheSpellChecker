@@ -18,10 +18,10 @@ import Data.Maybe (listToMaybe, maybe)
 import Data.Either (fromRight)
 
 import Expr
-import ParserUtility ( parse, failT, letter, many1, tryWhatever, Parser, ParseError, UserData(..), parseRealFloat)
+import ParserUtility ( parse, failT, letter, many1, tryWhatever, Parser, ParseError, UserData(..), parseRealFloat, parseDiffArg)
 import ParseExpr ( parseExpr )
-import Calculus (differentiate)
-import Utility (applyNtimesM)
+import Calculus (differentiate, differentiateFunction)
+import Utility (applyAllM)
 import Draw (Drawable(..))
 
 
@@ -59,15 +59,16 @@ parseData = try (UserFunction <$> (Function <$> parseName <*> (char '(' *> parse
 
 parseFunctionName :: (RealFloat n) => Parser n (Function n)
 parseFunctionName = do
-    name <- T.pack <$> many1 letter
-    d <- length <$> many (char '\'')
+    name    <- T.pack <$> many1 letter
     (fs, _) <- lift get
     case listToMaybe [ f | UserFunction f@(Function fname params ex) <- fs, fname == name ] of
         Nothing -> fail "No such function has been defined"
         Just f@(Function fname [] ex) -> pure f
-        Just f@(Function fname (p:ps) ex) -> case applyNtimesM d (`differentiate` p) ex of
-            Left err -> failT err
-            Right ex -> pure $ Function (fname <> T.pack (replicate d '\'')) (p:ps) ex
+        Just f@(Function fname ps ex) -> do
+            diffs <- many (parseDiffArg ps)
+            case applyAllM (map (maybe (`differentiateFunction` (head ps)) (flip differentiateFunction)) diffs) f of
+                Left err -> failT err
+                Right f2 -> pure f2
 
 parsePoint :: (Show n, RealFloat n) => Parser n (Drawable n)
 parsePoint = Point <$> (char '(' *> parseConstant <* char ',') <*> parseConstant <* char ')'

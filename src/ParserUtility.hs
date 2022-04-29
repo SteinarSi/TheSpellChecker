@@ -7,7 +7,7 @@ module ParserUtility where
 
 import Text.Megaparsec (ParsecT, runParserT, many, oneOf, (<|>), try)
 import Text.Megaparsec.Error (ParseErrorBundle)
-import Text.Megaparsec.Char (string)
+import Text.Megaparsec.Char (string, char)
 import Control.Monad.State.Lazy
 import Data.Void (Void)
 import Data.Text (Text)
@@ -17,8 +17,6 @@ import qualified Data.Text as T
 
 import Expr
 import Utility
-
-
 
 
 type Parser n = ParsecT Void Text (State ([UserData n], [Text]))
@@ -69,6 +67,14 @@ parseVar = do
 
 parseInteger :: Parser n Integer
 parseInteger = read <$> many1 digit
+
+parseDiffArg :: RealFloat n => [Parameter] -> Parser n (Maybe Text)
+parseDiffArg params = do
+    char '\''
+    d <- T.pack <$> many letter
+    if T.null d then pure Nothing
+    else if elem d params then pure (Just d)
+    else failT ("Unrecognized parameter: " <> d)
 
 digit :: Parser n Char
 digit = oneOf ['0'..'9']

@@ -18,6 +18,10 @@ linspace n (from, to) = let interval = to - from
 realToRat :: (Real a, Fractional b) => a -> b
 realToRat = fromRational . realToFrac
 
+applyAllM :: Monad m => [(a -> m a)] -> a -> m a
+applyAllM []     a = pure a
+applyAllM (f:fs) a = f a >>= applyAllM fs
+
 applyNtimesM :: Monad m => Int -> (a -> m a) -> a -> m a 
 applyNtimesM n f a = iterate (>>= f) (pure a) !! n
 
@@ -28,6 +32,11 @@ deleteNth n (x:xs) = x : deleteNth (n-1) xs
 
 for :: [a] -> (a -> b) -> [b]
 for = flip map
+
+justs :: [Maybe a] -> [a]
+justs [] = []
+justs (Nothing:ms) = justs ms
+justs (Just x:ms) = x : justs ms
 
 instance TextShow CReal where
     showb = fromString . showCReal 3

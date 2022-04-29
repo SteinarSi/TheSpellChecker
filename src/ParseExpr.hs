@@ -16,39 +16,16 @@ import Data.List (foldl', find)
 import Data.Number.RealCyclotomic (RealCyclotomic)
 import Data.Bool (bool)
 
-import Control.Monad (replicateM)
+import Control.Monad (replicateM, unless)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.State (State, get, runState, evalState, modify)
 
-
-import Debug.Trace
 
 import Expr
 import Utility
 import ParserUtility
 import Data.Maybe (listToMaybe)
 import Calculus (differentiate, differentiateFunction)
-
-{-
-
-Function     => Name (Params) = Expr
-Name         => Letter | Letter Var
-Params       => Param | , Param | ε
-Param        => Letter | Letter Var
-Expr         => Term Expr' | - Expr
-Expr'        => + Term Expr' | - Term Expr' | ε
-Term         => Factor Term'
-Term'        => * Factor Term' | / Factor Term' | Factor Term' | ε
-Factor       => Num ^ Factor | Num
-Num          => (Expr) | Var | e | pi | RealCyclotomic | FunctionCall
-FunctionCall => Log[Expr](Expr) | Log RealCyclotomic (Expr) | Log (Expr) | ln(Num) | ...... etc, legg til flere her senere
-Var          => Letter | Letter Var
-Letter       => a | b | c | .... | z | A | B | ... | Z | α | β | ... | ω      (unntatt π)
-
--}
-
-
-
 
 
 parseExpr :: (RealFloat n) => Parser n (Expr n)
@@ -90,7 +67,6 @@ parseFunctionCall :: (RealFloat n) => Parser n (Expr n)
 parseFunctionCall = try (BFunc (Prefix Log) (Const E) <$> ((string "log" <|> string "Log" <|> string "ln" <|> string "Ln") *> char '(' *> parseExpr <* char ')')) --log med e som base
        <|> try (BFunc (Prefix Log) <$> ((string "log" <|> string "Log") *> (char '[' *> parseExpr <* char ']' <|> fmap Z parseInteger)) <*> (char '(' *> parseExpr <* char ')')) -- log med custom base
        <|> try (do
-            --name <- first [ try (string fname) | (_, fname, _, _) <- uFunctions, fname /= "-"]
             name <- first $ [try (string fname <* lookAhead (char '(')) | fname <- uFuncNames, fname /= "-"]
             let Just (c, _, _, _) = uFuncFromName name
             UFunc c <$> (char '(' *> parseExpr <* char ')') )
@@ -100,12 +76,9 @@ parseFunctionCall = try (BFunc (Prefix Log) (Const E) <$> ((string "log" <|> str
             BFunc c <$> (char '(' *> parseExpr <* char ',') <*> parseExpr <* char ')' )
        <|> (do
             name    <- T.pack <$> many1 letter
-            d       <- length <$> many (char '\'')
             (fs, _) <- lift get
             f1@(Function _ params _) <- maybe (failT ("Unrecognized function: " <> name)) pure $ listToMaybe [ f | UserFunction f@(Function fname _ _)<-fs, name == fname ]
-            f2@(Function fname params ex) <- either failT pure $ applyNtimesM d (`differentiateFunction` bool (head params) "default" (null params)) f1
-            FFunc f2 <$> (char '(' *> replicateM (length params) (tryWhatever (char ',') parseExpr) <* char ')')
-       )
-
-testB = parse parseFunctionCall [] "tanh(2)"
-testA = parse (first [try (string "tan" <* lookAhead (char '(')), try (string "tanh") ]) [] "tanh(2)"
+            diffs   <- many (parseDiffArg params)
+            f2@(Function fname params ex) <- either failT pure $ applyAllM (map (maybe (`differentiateFunction` (head params)) (flip differentiateFunction)) diffs) f1
+            FFunc f2 <$> (char '(' *> replicateM (length params) (tryWhatever (char ',') parseExpr) <* char ')')   
+        )

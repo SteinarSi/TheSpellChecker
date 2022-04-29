@@ -38,7 +38,9 @@ simplifyData (UserFunction (Function name params ex)) = UserFunction (Function n
 simplifyData (UserVariable name ex) = UserVariable name (simplify ex)
 
 differentiateFunction :: RealFloat n => Function n -> Text -> Either Text (Function n)
-differentiateFunction (Function name params ex) x = Function (name <> "'") params <$> differentiate ex x
+differentiateFunction (Function name params ex) x = Function newname params <$> differentiate ex x
+    where newname | length params <= 1 = name <> "'"
+                  | otherwise = name <> "'" <> x
 
 differentiate :: (RealFloat n) => Expr n -> Text -> Either Text (Expr n)
 differentiate expr x = fmap simplify (diff (simplify expr) x)
