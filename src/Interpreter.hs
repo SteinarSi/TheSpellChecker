@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, FlexibleContexts #-}
 
 module Interpreter where
 
@@ -13,7 +13,8 @@ import Numeric (showFFloat)
 import Utility (debug)
 import Expr ( Function(Function), eval, inline )
 import ParseREPL( parseCommand, Command(..), parseData )
-import ParserUtility (UserData(..), parse)
+import ParserUtility (UserData(..), parse, ParseError)
+import qualified Text.Megaparsec.Error as M
 import Calculus (simplify, simplifyData)
 import Draw
 
@@ -23,7 +24,7 @@ loop :: [UserData Double] -> [Drawable Double] -> IO ()
 loop fs ds = do
     inn <- getLine
     case parseCommand fs (T.pack inn) of 
-        Left err -> print err >> loop fs ds
+        Left err -> showErrors err >> loop fs ds
         Right ex -> case ex of
             Help -> readFile "data/help.txt" >>= putStrLn >> loop fs ds
             Quit -> putStrLn "Bye-bye!"
@@ -48,3 +49,8 @@ loadData = fmap (loadData' [] . lines) $ readFile "data/userdata.txt"
               Left  _ -> loadData' dt xs
               Right d -> loadData' (d:dt) xs
           
+showErrors :: ParseError -> IO ()
+showErrors err = putStrLn "Parse error: " >> mapM_ showError (M.bundleErrors err)
+    where showError (M.TrivialError _ Nothing s) = putStrLn ("    Unexpected end of input, expected one of " <> show s <> ".")
+          showError (M.TrivialError _ (Just token) s) = putStrLn ("    Unexpected token '" <> show token <> "', expected one of " <> show s <> ".")
+          showError (M.FancyError _ errors) = mapM_ (putStrLn . ("    "++) . show) errors
