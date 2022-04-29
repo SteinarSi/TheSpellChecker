@@ -3,7 +3,7 @@
 {-# OPTIONS_GHC -Wno-overlapping-patterns #-}
 
 
-module Calculus where
+module Calculus (simplify, simplifyData, differentiate, evalAll, differentiateFunction) where
 
 
 import Data.Text (Text)
@@ -11,9 +11,11 @@ import TextShow (TextShow)
 import Data.List (sort, find, delete)
 import Control.Monad.Writer
 
+
 import Data.Either (rights)
 
 
+import ParserUtility (UserData(..))
 import Expr
 import Utility
 
@@ -31,8 +33,9 @@ splitRights = splitRights' []
           splitRights' ys (Left  _ : xs) = reverse ys : splitRights' [] xs
           splitRights' ys (Right y : xs) = splitRights' (y:ys) xs
 
-simplifyFunction :: RealFloat n => Function n -> Function n
-simplifyFunction (Function name params ex) = Function name params (simplify ex)
+simplifyData :: RealFloat n => UserData n -> UserData n
+simplifyData (UserFunction (Function name params ex)) = UserFunction (Function name params (simplify ex))
+simplifyData (UserVariable name ex) = UserVariable name (simplify ex)
 
 differentiateFunction :: RealFloat n => Function n -> Text -> Either Text (Function n)
 differentiateFunction (Function name params ex) x = Function (name <> "'") params <$> differentiate ex x

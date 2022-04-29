@@ -29,7 +29,7 @@ data CircleView = CV {
 
 
 draw :: (Show a, RealFloat a, Enum a) => [Drawable a] -> IO ()
-draw ds = play FullScreen white 1 (World (CV (0, 0) 10) ds) paint move (const id)
+draw ds = play FullScreen white 1 (World defaultView ds) paint move (const id)
 
 
 move :: Event -> World a -> World a
@@ -42,12 +42,15 @@ move e@(EventKey (SpecialKey dir) Down _ _) w@(World (CV (x, y) r) ds) = case di
 move e@(EventKey (Char c) Down _ _) w@(World (CV (x, y) r) ds) = case c of
     'z' -> World (CV (x, y) (r/2)) ds
     'x' -> World (CV (x, y) (r*2)) ds
+    'r' -> World defaultView ds
     _   -> w
 move e v = v
 
 nTicks :: Float
 nTicks = 21
 
+defaultView :: CircleView
+defaultView = CV (0, 0) 10
 
 paint :: (Show a, RealFloat a, Enum a) => World a -> Picture
 paint w@(World cv dt) = pictures [grid, xAxe cv, yAxe cv, drawFeatures w]

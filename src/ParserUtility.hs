@@ -12,7 +12,7 @@ import Control.Monad.State.Lazy
 import Data.Void (Void)
 import Data.Text (Text)
 import Data.Text.Read (double)
-import Data.List (foldl', find)
+import Data.List (foldl', find, intercalate)
 import qualified Data.Text as T
 
 import Expr
@@ -25,6 +25,10 @@ type Parser n = ParsecT Void Text (State ([UserData n], [Text]))
 type ParseError = ParseErrorBundle Text Void
 data UserData n = UserFunction (Function n)
                 | UserVariable Text (Expr n)
+
+instance (RealFloat n, Show n) => Show (UserData n) where
+    show (UserVariable name ex) = T.unpack name <> " = " <> show ex
+    show (UserFunction (Function name params ex)) = T.unpack name <> "(" <> intercalate "," (map T.unpack params) <> ") = " <> show ex
 
 instance Eq (UserData n) where
     (==) (UserFunction (Function name1 _ _)) (UserFunction (Function name2 _ _)) = name1 == name2

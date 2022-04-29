@@ -22,17 +22,18 @@ import ParserUtility ( parse, failT, letter, many1, tryWhatever, Parser, ParseEr
 import ParseExpr ( parseExpr )
 import Calculus (differentiate)
 import Utility (applyNtimesM)
-import Draw
+import Draw (Drawable(..))
 
 
-data Command n = NewFunction (Function n)
-               | NewVariable Text (Expr n)
+data Command n = NewData (UserData n)
                | ShowFunction (Function n)
                | Eval (Expr n)
                | NoAction
                | Draw
                | Clear
                | AddDrawable (Drawable n)
+               | Save
+               | Load
                | Quit
                | Help
 
@@ -44,12 +45,17 @@ parseCommand = parse parseCommand'
                 <|> try (Quit <$ (string "quit" <|> string "q" <|> string "Quit") <* eof)
                 <|> try (Clear <$ (string "clear" <|> string "c" <|> string "Clear") <* eof)
                 <|> try (Draw <$ (string "draw" <|> string "d" <|> string "Draw") <* eof)
+                <|> try (Save <$ (string "save" <|> string "s" <|> string "Save") <* eof)
+                <|> try (Load <$ (string "load" <|> string "l" <|> string "Load") <* eof)
                 <|> try (ShowFunction <$> parseFunctionName <* eof)
                 <|> try (Eval <$> parseExpr <* eof)
-                <|> try (NewFunction <$> (Function <$> parseName <*> (char '(' *> parseParams <* char ')' <* char '=') <*> parseExpr <* eof))
-                <|> try (NewVariable . T.pack <$> many1 letter <*> (many (char ' ') *> char '=' *> parseExpr ))
+                <|> try (NewData <$> parseData)
                 <|> try (AddDrawable <$> (string "add" *> (parsePoint <|> (DFunction <$> parseFunctionName))))
                 <|> NoAction <$ eof
+
+parseData :: RealFloat n => Parser n (UserData n)
+parseData = try (UserFunction <$> (Function <$> parseName <*> (char '(' *> parseParams <* char ')' <* char '=') <*> parseExpr <* eof))
+        <|> UserVariable . T.pack <$> many1 letter <*> (char '=' *> parseExpr)
 
 parseFunctionName :: (RealFloat n) => Parser n (Function n)
 parseFunctionName = do

@@ -8,15 +8,14 @@ module Expr (Expr(..), Argument, Parameter, Constant(..), Function(Function), Un
     PrefixFunction(..), InfixFunction(..), bFunctions, uFunctions, bFuncFromName, uFuncFromName, bFuncFromConstr, uFuncFromConstr, isConstant,
         betaReduce, uFuncNames, bFuncNames, debug, eval, inline) where
 
-import Data.Number.RealCyclotomic (RealCyclotomic, toReal, toRat)
 import Data.Text (Text, unpack, pack, toLower)
 import qualified Data.Text as T
 import Data.List (intercalate, foldr1, intersperse)
-import TextShow (TextShow(..), showbParen, showb, fromText, toText, toString)
+import TextShow (TextShow(..), showbParen, showb, fromText, toText, toString, fromString)
 import Data.Maybe (listToMaybe)
 import Data.Bool (bool)
-
-import Test.LeanCheck
+import Test.LeanCheck (Listable, cons1, cons2,cons3, list, tiers, (\/))
+import Numeric (showFFloat)
 
 import Utility (realToRat, Debug(debug))
 
@@ -130,19 +129,18 @@ bFuncFromConstr :: (Show n, RealFloat n) => BinaryFunction -> (BinaryFunction, T
 bFuncFromConstr c = head [ f | f@(con, _, _, _) <- bFunctions, con == c ]
 
 
-instance (Floating n, TextShow n) => Show (Function n) where
+instance RealFloat n => Show (Function n) where
     show (Function name params expr) = unpack name <> "(" <> intercalate "," (map unpack params) <> ") = " <> toString (showb expr)
 
 instance Eq (Function n) where
     (Function name1 _ _) == (Function name2 _ _) = name1 == name2
 
--- debug (Function name params expr) = unpack name <> "(" <> intercalate "," (map unpack params) <> ") = " <> debug expr
-instance (Floating n, TextShow n) => TextShow (Expr n) where
+instance (RealFloat n) => TextShow (Expr n) where
     showbPrec p (FFunc (Function name [] _) _) = fromText name
     showbPrec p (FFunc (Function name _ _) args) = fromText name <> "(" <> foldr1 ((<>) . (<> ",")) (map showb args) <> ")"
     showbPrec p (Const c)   = let (_, name, _) = constantFromConstr c in fromText name
     showbPrec p (Z n)     = showb n
-    showbPrec p (R  a)    = showb a
+    showbPrec p (R  a)    = fromString (showFFloat Nothing a "")
     showbPrec p (BoundedVar v)     = fromText v
     showbPrec p (FreeVar n _) = fromText n
     showbPrec p (UFunc USub a) = showbParen (5 < p) ("-" <> showbPrec 5 a)
@@ -154,7 +152,7 @@ instance (Floating n, TextShow n) => TextShow (Expr n) where
                                             opPrec = infixPrecedence c
                                         in  showbParen (opPrec < p) (showbPrec opPrec a <> fromText op <> showbPrec opPrec b)
 
-instance (TextShow n, Floating n) => Show (Expr n) where
+instance (RealFloat n) => Show (Expr n) where
     show = toString . showb
 
 instance Num n => Num (Expr n) where
