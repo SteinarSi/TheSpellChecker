@@ -9,7 +9,8 @@ import TextShow (showb, toString)
 import Data.Number.CReal
 
 import Expr
-import ParseExpr
+import ParseExpr (parseExpr)
+import ParserUtility (parse)
 
 
 testExpr :: Test 

@@ -1,14 +1,16 @@
 
 {-# LANGUAGE OverloadedStrings #-}
 
-module TestParser where
+module TestParser (testParser, propParseIsOppositeOfShow) where
 
 import Test.HUnit ( assertEqual, Test(TestCase, TestList) )
 import Data.Either (fromRight)
 import Data.Number.CReal
+import qualified Data.Text as T
 
 
-import ParseExpr
+import ParseExpr (parseExpr)
+import ParserUtility (parse)
 import Expr
 
 testParser :: Test
@@ -23,5 +25,7 @@ multPrecedence = TestCase (assertEqual "2+3*4" (Right (BFunc (Infix Add) (Z 2 ::
 noMult :: Test
 noMult = TestCase (assertEqual "2 - (3)" (Right (BFunc (Infix BSub) (Z 2 :: Expr CReal) (Z 3))) (parse parseExpr [] "2 - (3)"))
 
-
-showParseOpposite :: 
+propParseIsOppositeOfShow :: Expr CReal -> Bool
+propParseIsOppositeOfShow e1 = case parse parseExpr [] (T.pack (show e1)) of
+    Left _   -> False
+    Right e2 -> eval e1 == eval e2
